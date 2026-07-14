@@ -1,0 +1,83 @@
+# ============================================================================
+# config.yaml
+# Parametros centrales del pipeline de deteccion de AMR en E. coli.
+#
+# Regla de diseno: todo valor que pueda cambiar entre corridas o segun el
+# criterio del analista vive aqui, nunca fijado (hardcoded) dentro de los
+# scripts de Python o R. Los scripts y reglas de Snakemake solo deben LEER
+# estos valores.
+# ============================================================================
+
+# Ruta a la tabla de muestras (ver config/samples.tsv).
+samples: "config/samples.tsv"
+
+# Ruta al archivo que clasifica los genes de resistencia en categorias
+# (BLEE, AmpC, carbapenemasas). Ver config/resistance_targets.yaml.
+resistance_targets: "config/resistance_targets.yaml"
+
+# ----------------------------------------------------------------------------
+# Numero de hilos (threads) asignados a cada herramienta externa.
+# Ajustar segun los nucleos disponibles en la maquina donde se ejecute el pipeline.
+# ----------------------------------------------------------------------------
+threads:
+  download: 4
+  fastp: 4
+  spades: 8
+  quast: 4
+  kraken2: 4
+  amrfinder: 4
+
+# ----------------------------------------------------------------------------
+# Control de calidad de lecturas crudas (fastp) y estimacion de cobertura.
+# ----------------------------------------------------------------------------
+quality:
+  minimum_length: 50            # longitud minima de lectura tras el recorte (pb)
+  minimum_phred: 20              # calidad Phred minima aceptada
+  minimum_coverage: 30            # cobertura minima (X) para que una muestra se marque PASS
+  warning_coverage: 15             # por debajo de minimum_coverage pero >= este valor -> WARNING; por debajo -> FAIL
+  estimated_genome_size: 5000000  # tamano de genoma esperado de E. coli (pb), usado para estimar cobertura antes del ensamblaje
+
+# ----------------------------------------------------------------------------
+# Umbrales de ensamblaje genomico (SPAdes) y de evaluacion del ensamblaje (QUAST).
+# ----------------------------------------------------------------------------
+assembly:
+  minimum_contig_length: 500       # contigs mas cortos que esto se descartan tras el ensamblaje
+  maximum_contigs: 500              # mas contigs que esto indica un ensamblaje muy fragmentado -> FAIL
+  minimum_total_length: 4000000     # longitud total esperada para un genoma de E. coli (pb)
+  maximum_total_length: 6500000
+  n50_warning_threshold: 20000        # N50 menor a esto -> WARNING (ensamblaje mas fragmentado de lo ideal)
+  minimum_completeness: 95            # completitud minima (%) para PASS
+  maximum_contamination: 5             # contaminacion maxima (%) para PASS
+
+# ----------------------------------------------------------------------------
+# Identificacion taxonomica (Kraken2): confirmar que cada muestra corresponde a E. coli.
+# ----------------------------------------------------------------------------
+taxonomy:
+  minimum_ecoli_percentage: 90        # % de lecturas asignadas a E. coli para PASS
+  warning_ecoli_percentage: 70         # entre este valor y minimum_ecoli_percentage -> WARNING
+  maximum_contaminant_percentage: 5     # % maximo de otras especies para seguir considerando PASS
+
+# ----------------------------------------------------------------------------
+# Deteccion de resistencia antimicrobiana (AMRFinderPlus).
+# ----------------------------------------------------------------------------
+amr:
+  minimum_identity: 90          # % de identidad minima para aceptar un gen detectado
+  minimum_gene_coverage: 80      # % de cobertura minima del gen de referencia
+  target_classes:                 # clases de antimicrobianos de interes para este estudio
+    - CEPHALOSPORIN
+    - BETA-LACTAM
+
+# ----------------------------------------------------------------------------
+# Pruebas de reproducibilidad: numero de corridas repetidas por muestra
+# bajo las mismas condiciones (ver seccion de reproducibilidad).
+# ----------------------------------------------------------------------------
+reproducibility:
+  number_of_replicate_runs: 3
+
+# ----------------------------------------------------------------------------
+# Rutas a bases de datos de referencia usadas por las herramientas externas.
+# ----------------------------------------------------------------------------
+paths:
+  kraken_database: "data/reference/kraken2"
+  amrfinder_database: "data/reference/amrfinder"
+  checkm_database: "data/reference/checkm"

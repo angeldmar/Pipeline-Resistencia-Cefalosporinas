@@ -1,0 +1,41 @@
+# Configuracion de IDE (JetBrains)
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+
+# Snakemake
+.snakemake/
+
+# Sistema operativo
+.DS_Store
+
+# Datos y resultados generados: pueden pesar varios GB y son reproducibles
+# a partir de config/samples.tsv + el pipeline, por lo que no se versionan.
+# Se conserva la estructura de carpetas via .gitkeep.
+data/raw/*
+!data/raw/.gitkeep
+data/reference/*
+!data/reference/.gitkeep
+
+results/qc/*
+!results/qc/.gitkeep
+results/trimmed/*
+!results/trimmed/.gitkeep
+results/assemblies/*
+!results/assemblies/.gitkeep
+results/taxonomy/*
+!results/taxonomy/.gitkeep
+results/amr/*
+!results/amr/.gitkeep
+results/tables/*
+!results/tables/.gitkeep
+results/statistics/*
+!results/statistics/.gitkeep
+results/reports/*
+!results/reports/.gitkeep
+
+logs/*
+!logs/.gitkeep

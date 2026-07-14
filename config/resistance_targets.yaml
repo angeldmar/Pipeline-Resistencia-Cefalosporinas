@@ -1,0 +1,52 @@
+# ============================================================================
+# resistance_targets.yaml
+# Clasificacion de familias de beta-lactamasas relevantes para resistencia a
+# cefalosporinas de tercera generacion en E. coli.
+#
+# Este archivo lo usa workflow/scripts/classify_cephalosporin_genes.py para
+# decidir a que categoria mecanistica pertenece un gen detectado por
+# AMRFinderPlus. Mantener esta clasificacion en YAML (y no dentro del script)
+# permite actualizarla cuando aparezcan nuevas familias de genes, sin tocar
+# codigo Python.
+#
+# IMPORTANTE (ver seccion 13.3 del diseno del pipeline): la sola presencia de
+# un prefijo de familia (por ejemplo "SHV" o "TEM") NO implica que el gen sea
+# una BLEE (beta-lactamasa de espectro extendido). SHV-1 y TEM-1 son penicilinasas
+# de espectro estrecho; solo ciertos alelos dentro de esas familias (ej. SHV-2,
+# TEM-3 en adelante) amplian su espectro a cefalosporinas. Por eso el script de
+# clasificacion no debe decidir unicamente por el prefijo del simbolo del gen:
+# debe apoyarse en la subclase que reporta AMRFinderPlus (columna "Subclass",
+# valores como "EXTENDED-SPECTRUM") o en una tabla curada de alelos conocidos.
+# ============================================================================
+
+# Beta-lactamasas de espectro extendido (BLEE / ESBL): hidrolizan penicilinas,
+# cefalosporinas de espectro extendido (cefotaxima, ceftriaxona, ceftazidima) y
+# monobactamicos, pero no carbapenemicos.
+extended_spectrum_beta_lactamases:
+  - CTX-M
+  - SHV-ESBL
+  - TEM-ESBL
+  - VEB
+  - PER
+  - GES-ESBL
+
+# Beta-lactamasas tipo AmpC: confieren resistencia a cefalosporinas (incluidas
+# cefamicinas) por un mecanismo distinto al de las BLEE, y no son inhibidas por
+# inhibidores clasicos de beta-lactamasas (ej. acido clavulanico).
+ampc:
+  - CMY
+  - DHA
+  - FOX
+  - ACC
+  - ACT
+  - MIR
+
+# Carbapenemasas: hidrolizan tambien carbapenemicos. Se incluyen aqui porque su
+# deteccion es clinicamente relevante en el mismo contexto de resistencia a
+# beta-lactamicos, aunque el foco principal de este pipeline sean las cefalosporinas.
+carbapenemases:
+  - KPC
+  - NDM
+  - VIM
+  - IMP
+  - OXA-48

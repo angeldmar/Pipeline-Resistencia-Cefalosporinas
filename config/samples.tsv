@@ -1,0 +1,4 @@
+sample_id	run_accession	biosample	sequencing_platform	phenotype_cefotaxime	phenotype_ceftriaxone	phenotype_ceftazidime	expected_genes	data_source
+EC001	SRR000001	SAMN000001	ILLUMINA	R	R	R	blaCTX-M-15	NCBI Pathogen Detection
+EC002	SRR000002	SAMN000002	ILLUMINA	S	S	S	none	NCBI Pathogen Detection
+EC003	SRR000003	SAMN000003	ILLUMINA	R	NA	R	blaCMY-2	NCBI Pathogen Detection
