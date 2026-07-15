@@ -14,6 +14,7 @@ rule fastp:
         r2="results/trimmed/{sample}_R2.fastq.gz",
         json="results/qc/fastp/{sample}.json",
         html="results/qc/fastp/{sample}.html",
+        performance="results/tables/performance/{sample}_fastp.tsv",
     log:
         "logs/fastp/{sample}.log",
     conda:
@@ -26,7 +27,7 @@ rule fastp:
           --sample-id {wildcards.sample} \
           --module fastp \
           --threads {threads} \
-          --output results/tables/performance/{wildcards.sample}_fastp.tsv \
+          --output {output.performance} \
           -- \
           fastp \
           --in1 {input.r1} \
@@ -70,5 +71,26 @@ rule parse_fastp:
           --genome-size {config[quality][estimated_genome_size]} \
           --minimum-coverage {config[quality][minimum_coverage]} \
           --warning-coverage {config[quality][warning_coverage]} \
+          > {log} 2>&1
+        """
+
+
+rule combine_fastp:
+    # Junta las tablas individuales de TODAS las muestras (SAMPLES, definido
+    # en el Snakefile principal) en un unico resumen. Este es el paso de
+    # agregacion que antes solo se podia correr manualmente por CLI.
+    input:
+        expand("results/tables/fastp/{sample}.tsv", sample=SAMPLES),
+    output:
+        "results/tables/fastp_summary.tsv",
+    log:
+        "logs/combine_fastp/combine.log",
+    conda:
+        "../envs/python.yaml"
+    shell:
+        """
+        python workflow/scripts/parse_fastp.py combine \
+          --input-dir results/tables/fastp \
+          --output {output} \
           > {log} 2>&1
         """

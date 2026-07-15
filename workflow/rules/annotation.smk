@@ -18,6 +18,7 @@ rule prokka:
         ffn="results/annotation/{sample}/{sample}.ffn",
         tsv="results/annotation/{sample}/{sample}.tsv",
         txt="results/annotation/{sample}/{sample}.txt",
+        performance="results/tables/performance/{sample}_prokka.tsv",
     params:
         outdir="results/annotation/{sample}",
         prefix="{sample}",
@@ -33,7 +34,7 @@ rule prokka:
           --sample-id {wildcards.sample} \
           --module prokka \
           --threads {threads} \
-          --output results/tables/performance/{wildcards.sample}_prokka.tsv \
+          --output {output.performance} \
           -- \
           prokka \
           --outdir {params.outdir} \

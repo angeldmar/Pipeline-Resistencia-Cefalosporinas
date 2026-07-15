@@ -16,6 +16,7 @@ rule spades:
         r2="results/trimmed/{sample}_R2.fastq.gz",
     output:
         assembly="results/assemblies/{sample}/contigs.fasta",
+        performance="results/tables/performance/{sample}_spades.tsv",
     params:
         outdir="results/assemblies/{sample}",
     log:
@@ -30,7 +31,7 @@ rule spades:
           --sample-id {wildcards.sample} \
           --module spades \
           --threads {threads} \
-          --output results/tables/performance/{wildcards.sample}_spades.tsv \
+          --output {output.performance} \
           -- \
           spades.py \
           -1 {input.r1} \
@@ -70,6 +71,7 @@ rule quast:
         "results/assemblies/{sample}/contigs.filtered.fasta",
     output:
         report="results/qc/quast/{sample}/report.tsv",
+        performance="results/tables/performance/{sample}_quast.tsv",
     params:
         outdir="results/qc/quast/{sample}",
     log:
@@ -84,7 +86,7 @@ rule quast:
           --sample-id {wildcards.sample} \
           --module quast \
           --threads {threads} \
-          --output results/tables/performance/{wildcards.sample}_quast.tsv \
+          --output {output.performance} \
           -- \
           quast.py {input} \
           --output-dir {params.outdir} \
@@ -121,6 +123,25 @@ rule parse_quast:
         """
 
 
+rule combine_quast:
+    # Junta las tablas individuales de TODAS las muestras en un unico resumen.
+    input:
+        expand("results/tables/quast/{sample}.tsv", sample=SAMPLES),
+    output:
+        "results/tables/quast_summary.tsv",
+    log:
+        "logs/combine_quast/combine.log",
+    conda:
+        "../envs/python.yaml"
+    shell:
+        """
+        python workflow/scripts/parse_quast.py combine \
+          --input-dir results/tables/quast \
+          --output {output} \
+          > {log} 2>&1
+        """
+
+
 rule checkm:
     # Estima completitud y contaminacion con CheckM, a partir de genes
     # marcadores de copia unica especificos del linaje taxonomico. CheckM
@@ -131,6 +152,7 @@ rule checkm:
         "results/assemblies/{sample}/contigs.filtered.fasta",
     output:
         report="results/qc/checkm/{sample}/checkm_summary.tsv",
+        performance="results/tables/performance/{sample}_checkm.tsv",
     params:
         bin_dir="results/qc/checkm/{sample}/bins",
         outdir="results/qc/checkm/{sample}/output",
@@ -150,7 +172,7 @@ rule checkm:
           --sample-id {wildcards.sample} \
           --module checkm \
           --threads {threads} \
-          --output results/tables/performance/{wildcards.sample}_checkm.tsv \
+          --output {output.performance} \
           -- \
           checkm lineage_wf \
           -x fasta \
@@ -180,5 +202,28 @@ rule parse_checkm:
           --output-dir results/tables/checkm \
           --minimum-completeness {config[assembly][minimum_completeness]} \
           --maximum-contamination {config[assembly][maximum_contamination]} \
+          > {log} 2>&1
+        """
+
+
+rule combine_checkm:
+    # Junta las tablas individuales de TODAS las muestras en un resumen, y
+    # ademas genera el registro de exclusiones (muestras FAIL, ver seccion
+    # 10 del diseno del pipeline: nunca se descartan en silencio).
+    input:
+        expand("results/tables/checkm/{sample}.tsv", sample=SAMPLES),
+    output:
+        summary="results/tables/checkm_summary.tsv",
+        exclusions="results/tables/checkm_exclusions.tsv",
+    log:
+        "logs/combine_checkm/combine.log",
+    conda:
+        "../envs/python.yaml"
+    shell:
+        """
+        python workflow/scripts/parse_checkm.py combine \
+          --input-dir results/tables/checkm \
+          --output {output.summary} \
+          --exclusions-output {output.exclusions} \
           > {log} 2>&1
         """

@@ -15,6 +15,7 @@ rule download_sample:
     output:
         r1="data/raw/{sample}_R1.fastq.gz",
         r2="data/raw/{sample}_R2.fastq.gz",
+        performance="results/tables/performance/{sample}_download.tsv",
     log:
         "logs/download/{sample}.log",
     conda:
@@ -27,7 +28,7 @@ rule download_sample:
           --sample-id {wildcards.sample} \
           --module download \
           --threads {threads} \
-          --output results/tables/performance/{wildcards.sample}_download.tsv \
+          --output {output.performance} \
           -- \
           python workflow/scripts/download_data.py {input.samples} \
             --sample-id {wildcards.sample} \

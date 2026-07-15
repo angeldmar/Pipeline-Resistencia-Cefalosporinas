@@ -1,23 +1,32 @@
 # ============================================================================
 # reports.smk
-# Integracion final de resultados (tabla maestra) y generacion de reportes.
-#
-# NOTA: al igual que las reglas de agregacion en amr_detection.smk, esta
-# regla depende de los *_summary.tsv de cada modulo (fastp, QUAST, CheckM,
-# Kraken2, AMRFinderPlus), que a su vez se arman juntando la tabla de TODAS
-# las muestras. Esa agregacion por muestra completa necesita SAMPLES, que
-# recien queda definido al construir el Snakefile principal. Por ahora,
-# master_results.tsv se genera manualmente con merge_results.py y esta regla
-# se conectara al grafo completo cuando se arme el Snakefile principal.
+# Agregacion de desempeno, integracion final de resultados (tabla maestra),
+# registro de versiones de herramientas y generacion de reportes HTML.
 # ============================================================================
+
+# Modulos "importantes" instrumentados con run_with_timing.py (ver parte de
+# medicion de desempeno). Prokka queda fuera a proposito: la anotacion es
+# informativa/complementaria y no es un objetivo por defecto de "rule all",
+# asi que exigir su archivo de desempeno forzaria a correrla para cada
+# muestra aunque nadie la haya pedido.
+PERFORMANCE_TRACKED_MODULES = ["download", "fastp", "spades", "quast", "checkm", "kraken2", "amrfinder"]
+
 
 rule combine_performance:
     # Junta los registros de tiempo/CPU/RAM de cada ejecucion individual
     # (results/tables/performance/{sample}_{module}.tsv, generados por
     # run_with_timing.py) en un listado largo y dos resumenes derivados
     # (por muestra y por modulo). Ver combine_performance.py para el detalle.
+    #
+    # El input se declara como la lista EXPLICITA de archivos esperados (no
+    # como la carpeta en si), para que Snakemake sepa que reglas debe correr
+    # primero para producirlos; una carpeta sola no es un objetivo valido de
+    # ninguna regla anterior.
     input:
-        performance_dir="results/tables/performance",
+        performance_files=expand(
+            "results/tables/performance/{sample}_{module}.tsv",
+            sample=SAMPLES, module=PERFORMANCE_TRACKED_MODULES,
+        ),
     output:
         summary="results/tables/performance_summary.tsv",
         by_sample="results/tables/performance_by_sample.tsv",
@@ -29,7 +38,7 @@ rule combine_performance:
     shell:
         """
         python workflow/scripts/combine_performance.py \
-          --input-dir {input.performance_dir} \
+          --input-dir results/tables/performance \
           --output {output.summary} \
           --by-sample-output {output.by_sample} \
           --by-module-output {output.by_module} \

@@ -15,6 +15,7 @@ rule kraken2:
     output:
         report="results/taxonomy/kraken2/{sample}/report.tsv",
         classification="results/taxonomy/kraken2/{sample}/classification.tsv",
+        performance="results/tables/performance/{sample}_kraken2.tsv",
     params:
         database=config["paths"]["kraken_database"],
     log:
@@ -29,7 +30,7 @@ rule kraken2:
           --sample-id {wildcards.sample} \
           --module kraken2 \
           --threads {threads} \
-          --output results/tables/performance/{wildcards.sample}_kraken2.tsv \
+          --output {output.performance} \
           -- \
           kraken2 \
           --db {params.database} \
@@ -67,5 +68,29 @@ rule parse_kraken2:
           --minimum-ecoli-percentage {config[taxonomy][minimum_ecoli_percentage]} \
           --warning-ecoli-percentage {config[taxonomy][warning_ecoli_percentage]} \
           --maximum-contaminant-percentage {config[taxonomy][maximum_contaminant_percentage]} \
+          > {log} 2>&1
+        """
+
+
+rule combine_taxonomy:
+    # Junta las tablas individuales de TODAS las muestras en un resumen, y
+    # ademas genera el registro de revision manual (muestras con presencia
+    # de Shigella, ver parse_kraken2.py: nunca se auto-excluyen ni se
+    # auto-aprueban solo por esa senal).
+    input:
+        expand("results/tables/taxonomy/{sample}.tsv", sample=SAMPLES),
+    output:
+        summary="results/tables/taxonomy_summary.tsv",
+        manual_review="results/tables/taxonomy_manual_review.tsv",
+    log:
+        "logs/combine_taxonomy/combine.log",
+    conda:
+        "../envs/python.yaml"
+    shell:
+        """
+        python workflow/scripts/parse_kraken2.py combine \
+          --input-dir results/tables/taxonomy \
+          --output {output.summary} \
+          --manual-review-output {output.manual_review} \
           > {log} 2>&1
         """

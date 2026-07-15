@@ -4,16 +4,6 @@
 # clasificacion mecanistica de las beta-lactamasas detectadas (BLEE, AmpC,
 # carbapenemasa) segun config/resistance_targets.yaml, y comparacion contra
 # el estandar de referencia documentado en samples.tsv.
-#
-# NOTA: las reglas de agregacion (classify_cephalosporin_genes y
-# compare_to_reference) toman como entrada results/tables/amr_summary.tsv,
-# que se arma juntando la tabla de CADA muestra (parse_amrfinder.py combine).
-# Esa regla de "combinar todas las muestras" necesita conocer la lista
-# completa de muestras (SAMPLES), que recien queda definida al construir el
-# Snakefile principal (parte pendiente del roadmap). Por eso, por ahora,
-# amr_summary.tsv se genera manualmente con:
-#   python workflow/scripts/parse_amrfinder.py combine
-# y se conectara al grafo de Snakemake cuando se arme el Snakefile principal.
 # ============================================================================
 
 rule amrfinder:
@@ -23,6 +13,7 @@ rule amrfinder:
         assembly="results/assemblies/{sample}/contigs.filtered.fasta",
     output:
         table="results/amr/amrfinder/{sample}.tsv",
+        performance="results/tables/performance/{sample}_amrfinder.tsv",
     log:
         "logs/amrfinder/{sample}.log",
     conda:
@@ -35,7 +26,7 @@ rule amrfinder:
           --sample-id {wildcards.sample} \
           --module amrfinder \
           --threads {threads} \
-          --output results/tables/performance/{wildcards.sample}_amrfinder.tsv \
+          --output {output.performance} \
           -- \
           amrfinder \
           --nucleotide {input.assembly} \
@@ -67,6 +58,25 @@ rule parse_amrfinder:
           --output-dir results/tables/amr \
           --minimum-identity {config[amr][minimum_identity]} \
           --minimum-gene-coverage {config[amr][minimum_gene_coverage]} \
+          > {log} 2>&1
+        """
+
+
+rule combine_amr:
+    # Junta el listado largo de TODAS las muestras en un unico archivo.
+    input:
+        expand("results/tables/amr/{sample}.tsv", sample=SAMPLES),
+    output:
+        "results/tables/amr_summary.tsv",
+    log:
+        "logs/combine_amr/combine.log",
+    conda:
+        "../envs/python.yaml"
+    shell:
+        """
+        python workflow/scripts/parse_amrfinder.py combine \
+          --input-dir results/tables/amr \
+          --output {output} \
           > {log} 2>&1
         """
 

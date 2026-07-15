@@ -83,7 +83,7 @@ ambientes Conda correspondientes (esto facilita ubicar el origen de cualquier er
 | 19 | Pruebas de reproducibilidad | ✅ Hecho |
 | 20 | Estadística en R | ✅ Hecho |
 | 21 | Generación de reportes HTML | ✅ Hecho |
-| 22 | Snakefile principal y reglas de Snakemake | ⏳ Pendiente |
+| 22 | Snakefile principal y reglas de Snakemake | ✅ Hecho |
 | 23 | Ambientes Conda | ⏳ Pendiente |
 | 24 | Pruebas (unitarias, integración, e2e, negativas) | ⏳ Pendiente |
 
@@ -771,9 +771,89 @@ Probado de extremo a extremo con `EC001` (3 genes: `blaCTX-M-15` confiable,
 - Probado también el caso sin genes detectados (`EC002`): ambas ramas
   condicionales de la plantilla ("no se detectaron genes...") funcionan.
 
+### 22. Snakefile principal
+
+Instalé Snakemake (`pip install snakemake`, versión 9.23.1) para poder
+validar de verdad el grafo completo — algo que no había sido posible hasta
+ahora, ya que este archivo era el que finalmente conectaba todas las piezas.
+
+**Reglas de agregación finalmente conectadas.** Las reglas `combine_fastp`,
+`combine_quast`, `combine_checkm` (+ `checkm_exclusions.tsv`),
+`combine_taxonomy` (+ `taxonomy_manual_review.tsv`) y `combine_amr` —
+pendientes desde las partes 8 a 15 porque necesitaban `SAMPLES` — se
+agregaron a sus archivos `.smk` correspondientes, cada una con
+`expand(..., sample=SAMPLES)` sobre la tabla individual de cada muestra.
+
+**Orden correcto de `configfile`/`include`/`SAMPLES`.** El ejemplo del
+documento (sección 20) ordena `include:` de las reglas *antes* de definir
+`SAMPLES`. Eso no funciona en este pipeline: las reglas `combine_*` nuevas
+usan `expand(..., sample=SAMPLES)` directamente en su `input:`, así que
+`SAMPLES` debe existir *antes* de que Snakemake evalúe esos archivos. El
+`Snakefile` reordena esto: `configfile` → validar muestras y construir
+`SAMPLES` → `include:` de todas las reglas → `rule all`.
+
+**Validación de muestras integrada al Snakefile, no como regla aparte.** En
+vez de envolver `validate_samples.py` en una regla de Snakemake que produce
+un archivo que nadie más usaría, el `Snakefile` importa directamente la
+función `validate_samples()` (la misma de la parte 3) y la llama al cargar
+el archivo. Si `samples.tsv` tiene un problema, Snakemake falla
+inmediatamente al leer el `Snakefile`, antes de intentar construir ningún
+grafo con datos no confiables — el script de línea de comandos sigue
+disponible para uso manual/CI tal como se probó en la parte 3.
+
+**Dos bugs reales encontrados por el dry-run (`snakemake -n`), no visibles
+hasta tener el Snakefile completo:**
+
+1. `combine_performance` declaraba como entrada la *carpeta*
+   `results/tables/performance` en vez de la lista de archivos esperados.
+   Snakemake no puede saber qué regla "produce" una carpeta suelta —
+   necesita depender de archivos concretos. Se corrigió con
+   `expand("results/tables/performance/{sample}_{module}.tsv", sample=SAMPLES, module=PERFORMANCE_TRACKED_MODULES)`.
+2. **Más importante:** las 7 reglas envueltas con `run_with_timing.py` en la
+   parte 18 (`download_sample`, `fastp`, `spades`, `quast`, `checkm`,
+   `kraken2`, `prokka`, `amrfinder`) escribían su archivo de desempeño
+   dentro del `shell:`, pero **nunca lo declaraban en `output:`**. Snakemake
+   solo rastrea archivos declarados explícitamente como salida; un archivo
+   que el comando simplemente "escribe de más" es invisible para el grafo de
+   dependencias. Se agregó `performance="results/tables/performance/{sample}_{module}.tsv"`
+   al `output:` de las 7 reglas, y el `shell:` de cada una ahora referencia
+   `{output.performance}` en vez de repetir la ruta a mano (evita que ambas
+   copias se desincronicen en el futuro).
+
+Ninguno de los dos bugs habría aparecido probando cada script por separado
+como se hizo en las partes anteriores — solo se manifestaron al construir el
+grafo completo, que es exactamente para lo que sirve `snakemake -n`.
+
+**`rule all`** pide, por muestra: su reporte HTML; y de forma global: la
+tabla maestra, el listado de AMR clasificado, los dos registros de
+exclusión/revisión manual (CheckM, Kraken2), y los cinco artefactos de
+estadística en R. La anotación (Prokka) queda disponible como regla pero
+fuera de `rule all` por defecto: es informativa/complementaria y no forma
+parte de los campos exigidos por el reporte individual (sección 19).
+
+**Recomendaciones de `snakemake --lint` no aplicadas, documentadas aquí a
+propósito:** el linter sugiere mover los valores de `config[...]` usados
+directamente en varios `shell:` hacia la directiva `params:` (mejor
+trazabilidad de procedencia), y reemplazar algunos `params` de tipo
+"prefijo de ruta" (`outdir`, `output_dir`) por funciones lambda (relevante
+para ejecutar en clústeres sin sistema de archivos compartido). Ambas son
+recomendaciones de estilo, no errores — confirmado por el dry-run, que
+resuelve y ejecuta el grafo completo sin problemas. Se documentan aquí en
+vez de aplicarse de forma masiva a las ~15 reglas afectadas, dado que este
+proyecto está pensado para correr en una sola máquina (no en un clúster
+distribuido) y el beneficio real es marginal frente al costo de tocar tantas
+reglas ya probadas.
+
+**Probado:** `snakemake -n --cores 1` (dry-run) contra el `samples.tsv` real
+de 3 muestras resuelve el grafo completo: 55 trabajos planeados, cadena
+íntegra desde `download_sample` hasta `generate_report` y `run_statistics`
+para las 3 muestras. También se verificó con `-p` (imprime los comandos
+reales) que los valores de `config.yaml` se sustituyen correctamente en los
+comandos generados (ej. `--length_required 50 --qualified_quality_phred 20`
+coincide exactamente con `quality.minimum_length` / `quality.minimum_phred`).
+
 ## Próximos pasos
 
-Continuar con la **parte 22**: Snakefile principal (sección 20 del diseño
-del pipeline) — incluye conectar las reglas de agregación (`combine_*`,
-`merge_results`, `run_statistics`) que hasta ahora se ejecutan manualmente
-porque dependían de la lista `SAMPLES`.
+Continuar con la **parte 23**: ambientes Conda (los archivos `workflow/envs/*.yaml`
+siguen vacíos; hace falta llenarlos para poder ejecutar el pipeline con
+herramientas bioinformáticas reales, no solo validar su estructura).
