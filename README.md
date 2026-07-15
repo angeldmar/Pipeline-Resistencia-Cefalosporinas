@@ -81,7 +81,7 @@ ambientes Conda correspondientes (esto facilita ubicar el origen de cualquier er
 | 17 | Integración de resultados (tabla maestra) | ✅ Hecho |
 | 18 | Medición de desempeño computacional | ✅ Hecho |
 | 19 | Pruebas de reproducibilidad | ✅ Hecho |
-| 20 | Estadística en R | ⏳ Pendiente |
+| 20 | Estadística en R | ✅ Hecho |
 | 21 | Generación de reportes HTML | ⏳ Pendiente |
 | 22 | Snakefile principal y reglas de Snakemake | ⏳ Pendiente |
 | 23 | Ambientes Conda | ⏳ Pendiente |
@@ -663,8 +663,60 @@ ensamblaje distinto y estado `WARNING` en vez de `PASS`) — las 3
 comparaciones por pares resultan correctas: 1 par totalmente concordante,
 2 pares discordantes en las tres dimensiones a la vez.
 
+### 20. Estadística en R
+
+**`workflow/scripts/prepare_validation_input.py`** (script nuevo, en Python)
+junta `reference_comparison.tsv` con `performance_by_sample.tsv` en
+`results/statistics/validation_input.csv`, con exactamente las columnas que
+pide el documento: `sample_id, reference_result, pipeline_result, run,
+elapsed_seconds, max_ram_gb`. Reutiliza la misma convención de corridas de
+reproducibilidad (`{base}_runN`) de la parte 19 para poblar la columna `run`
+correctamente; las muestras sin estándar de referencia
+(`reference_status="indeterminate"`) se excluyen explícitamente, ya que R
+espera un factor binario positive/negative y no hay nada contra qué
+compararlas. A partir de aquí, **Python no calcula ninguna estadística** —
+solo prepara y limpia los datos.
+
+**`workflow/scripts/run_statistics.R`** es el único script del pipeline que
+hace estadística formal. Instalé los paquetes `readr`, `caret`, `irr` y
+`ggplot2` en el R del sistema para poder probarlo de verdad (`caret` necesitó
+además `stringi`, que no se resolvió solo). Calcula:
+
+- **Matriz de confusión** (`caret::confusionMatrix`) → `confusion_matrix.txt`
+  (texto completo) y `contingency_table.csv` (la tabla 2×2 sola, para
+  reutilizar en el reporte HTML sin reparsear texto).
+- **Sensibilidad, especificidad y exactitud con intervalos de confianza del
+  95%** → `classification_metrics.csv`. `confusionMatrix` ya calcula un IC
+  para la exactitud global, pero no para sensibilidad/especificidad por
+  separado — se agregó `binom.test()` (Clopper-Pearson, en base R, sin
+  dependencias extra) para esas dos.
+- **Índice kappa** (`irr::kappa2`) → `kappa.csv`.
+- **Coeficiente de variación** de tiempo de ejecución y RAM entre corridas
+  repetidas → `cv_execution_time.csv` y `cv_ram_usage.csv` (exactamente la
+  función `cv()` del documento, aplicada también a RAM por generalización
+  directa, no solo a tiempo).
+- **Gráficas**: mapa de calor de la matriz de confusión y barras de CV de
+  tiempo por muestra, en `results/statistics/plots/`.
+
+**Límite de arquitectura respetado:** todo el cálculo de CV vive
+exclusivamente aquí, en R — Python (partes 18 y 19) solo dejó los datos
+crudos por corrida listos, sin calcular ningún CV, tal como exige el
+documento ("R se reservará únicamente para... Coeficiente de variación").
+
+Probado de extremo a extremo con datos sintéticos (7 filas: 3 corridas de
+reproducibilidad de una muestra + 4 muestras normales, con 1 TP/TN/FP/FN de
+cada tipo variado): sensibilidad 0.8 y especificidad 0.5 correctas
+aritméticamente (4 TP/1 FN → 0.8; 1 TN/1 FP → 0.5), y — como verificación
+cruzada — la kappa calculada independientemente por `irr::kappa2` (0.3)
+coincide exactamente con la kappa interna que reporta `caret` en el mismo
+análisis. El CV solo se calculó para la muestra con 3 corridas (2.3% en
+tiempo, 1.3% en RAM); el resto queda `NA` sin fallar el script (varianza
+indefinida con una sola corrida). Corrigiendo un defecto visual encontrado
+al revisar el gráfico generado (las celdas con conteo bajo eran casi
+invisibles con un gradiente que partía de blanco puro), se cambió la escala
+de color para que toda celda sea visible independientemente de su conteo.
+
 ## Próximos pasos
 
-Continuar con la **parte 20**: estadística en R (sección 18 del diseño del
-pipeline) — sensibilidad, especificidad, kappa, intervalos de confianza y
-coeficiente de variación.
+Continuar con la **parte 21**: generación de reportes HTML (sección 19 del
+diseño del pipeline).
