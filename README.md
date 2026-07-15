@@ -75,7 +75,7 @@ ambientes Conda correspondientes (esto facilita ubicar el origen de cualquier er
 | 11 | Evaluación del ensamblaje (QUAST) | ✅ Hecho |
 | 12 | Completitud y contaminación (CheckM) | ✅ Hecho |
 | 13 | Identificación taxonómica (Kraken2) | ✅ Hecho |
-| 14 | Anotación genómica | ⏳ Pendiente |
+| 14 | Anotación genómica (Prokka) | ✅ Hecho |
 | 15 | Detección de AMR (AMRFinderPlus) | ⏳ Pendiente |
 | 16 | Comparación con estándar de referencia | ⏳ Pendiente |
 | 17 | Integración de resultados (tabla maestra) | ⏳ Pendiente |
@@ -371,7 +371,45 @@ Probado con tres reportes Kraken2 sintéticos (formato real, jerárquico):
   predominante se identifica correctamente como *Klebsiella pneumoniae* (no
   se asume que el taxón predominante sea siempre *E. coli*).
 
+### 14. Anotación genómica (Prokka)
+
+Herramienta no especificada por el documento; se acordó con el usuario usar
+**Prokka** (estándar clásico, ampliamente citado, sin necesidad de descargar
+una base de datos de referencia grande, a diferencia de Bakta). Se creó
+**`workflow/rules/annotation.smk`** (archivo nuevo, no estaba en la lista fija
+de reglas — igual que ocurrió con algunos scripts en partes anteriores) con
+dos reglas:
+
+- `prokka`: anota el ensamblaje filtrado y produce `.gff`, `.gbk`, `.faa`,
+  `.ffn`, además de `.tsv` y `.txt` (que Prokka genera igual, y que el
+  parser usa para no tener que recalcular nada). Se le indica género/especie
+  (`--genus Escherichia --species coli`) para una anotación más precisa.
+- `parse_prokka`: llama a `parse_prokka.py parse` sobre el resumen de Prokka.
+
+**`workflow/scripts/parse_prokka.py`** (script nuevo) **no vuelve a anotar
+nada**: solo organiza lo que Prokka ya calculó. Extrae CDS, ARN ribosómico y
+ARN de transferencia directamente del resumen `{sample}.txt` que Prokka
+genera (evita recalcular conteos que la propia herramienta ya entrega),
+cuenta los genes anotados como `"hypothetical protein"` (sin función
+conocida) a partir de la tabla `{sample}.tsv`, y registra la versión de
+Prokka consultando `prokka --version` en tiempo de ejecución (si la
+herramienta no está disponible, registra `"unknown"` en vez de fallar, ya
+que es un dato de trazabilidad, no bloqueante).
+
+Se agregó `results/annotation/` a la estructura de resultados (no estaba en
+la lista original de subcarpetas de `results/`) y `threads.prokka` en
+`config.yaml`.
+
+Como nota el propio documento, este paso es informativo/complementario:
+AMRFinderPlus (parte 15) trabaja directamente sobre el ensamblaje de
+nucleótidos y no depende de esta anotación.
+
+Probado con un resumen y una tabla de Prokka sintéticos (formato real):
+extrae correctamente CDS/rRNA/tRNA del resumen, cuenta bien 2 genes
+hipotéticos de 5 filas de ejemplo, y maneja sin fallar el caso de Prokka no
+instalado (versión `"unknown"`).
+
 ## Próximos pasos
 
-Continuar con la **parte 14**: anotación genómica (sección 12 del diseño del
-pipeline).
+Continuar con la **parte 15**: detección de resistencia antimicrobiana con
+AMRFinderPlus (sección 13 del diseño del pipeline).

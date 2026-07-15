@@ -26,6 +26,8 @@ results/trimmed/*
 !results/trimmed/.gitkeep
 results/assemblies/*
 !results/assemblies/.gitkeep
+results/annotation/*
+!results/annotation/.gitkeep
 results/taxonomy/*
 !results/taxonomy/.gitkeep
 results/amr/*
