@@ -25,7 +25,13 @@ rule kraken2:
         config["threads"]["kraken2"]
     shell:
         """
-        kraken2 \
+        python workflow/scripts/run_with_timing.py \
+          --sample-id {wildcards.sample} \
+          --module kraken2 \
+          --threads {threads} \
+          --output results/tables/performance/{wildcards.sample}_kraken2.tsv \
+          -- \
+          kraken2 \
           --db {params.database} \
           --paired {input.r1} {input.r2} \
           --threads {threads} \

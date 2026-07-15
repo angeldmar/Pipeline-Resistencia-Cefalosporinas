@@ -29,7 +29,13 @@ rule prokka:
         config["threads"]["prokka"]
     shell:
         """
-        prokka \
+        python workflow/scripts/run_with_timing.py \
+          --sample-id {wildcards.sample} \
+          --module prokka \
+          --threads {threads} \
+          --output results/tables/performance/{wildcards.sample}_prokka.tsv \
+          -- \
+          prokka \
           --outdir {params.outdir} \
           --prefix {params.prefix} \
           --genus Escherichia \

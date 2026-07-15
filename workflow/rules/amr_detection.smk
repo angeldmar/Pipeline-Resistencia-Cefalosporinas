@@ -31,7 +31,13 @@ rule amrfinder:
         config["threads"]["amrfinder"]
     shell:
         """
-        amrfinder \
+        python workflow/scripts/run_with_timing.py \
+          --sample-id {wildcards.sample} \
+          --module amrfinder \
+          --threads {threads} \
+          --output results/tables/performance/{wildcards.sample}_amrfinder.tsv \
+          -- \
+          amrfinder \
           --nucleotide {input.assembly} \
           --organism Escherichia \
           --threads {threads} \

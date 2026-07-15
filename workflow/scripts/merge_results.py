@@ -4,8 +4,8 @@ Junta, en una sola tabla con UNA FILA POR MUESTRA, los resultados de todos
 los modulos anteriores: metadatos y fenotipo (samples.tsv), calidad de
 lecturas y cobertura (fastp), metricas de ensamblaje (QUAST), completitud y
 contaminacion (CheckM), identificacion taxonomica (Kraken2), un resumen de
-los genes de resistencia detectados (AMRFinderPlus), y la comparacion contra
-el estandar de referencia.
+los genes de resistencia detectados (AMRFinderPlus), la comparacion contra
+el estandar de referencia, y el tiempo/RAM totales por muestra.
 
 Siguiendo la recomendacion de la seccion de integracion de resultados del
 diseno del pipeline, esta tabla maestra NO intenta meter el detalle de cada
@@ -13,13 +13,10 @@ gen detectado en columnas (eso generaria una tabla ancha y dificil de leer,
 distinta por muestra segun cuantos genes tenga). El detalle gen por gen ya
 vive en la tabla larga (results/tables/amr_summary.tsv /
 amr_classified.tsv); aqui solo se agrega un resumen corto (cuantos genes,
-cuales) para tener una vista rapida por muestra.
-
-NOTA sobre columnas pendientes: "Tiempo" y "Memoria" (medicion de desempeño
-computacional) todavia no existen como modulo del pipeline -- se agregan en
-un paso posterior (medicion de desempeño), siguiendo el orden recomendado de
-construccion del pipeline (primero la tabla maestra, despues el tiempo/RAM).
-Cuando ese modulo exista, este script se extendera para incorporarlas.
+cuales) para tener una vista rapida por muestra. Lo mismo aplica al
+desempeno computacional: aqui solo entran el tiempo TOTAL y la RAM maxima
+por muestra; el detalle por modulo vive en performance_summary.tsv /
+performance_by_module.tsv (ver combine_performance.py).
 """
 
 from __future__ import annotations
@@ -109,6 +106,7 @@ def build_master_table(
     taxonomy_table: pd.DataFrame | None,
     amr_table: pd.DataFrame | None,
     reference_comparison_table: pd.DataFrame | None,
+    performance_by_sample_table: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Arma la tabla maestra: parte de samples.tsv (para que TODA muestra
     documentada aparezca, incluso si a algun modulo todavia le falta
@@ -147,6 +145,16 @@ def build_master_table(
         ].rename(columns={"detected_gene": "reference_detected_gene"})
         master_table = master_table.merge(reference_columns, on="sample_id", how="left")
 
+    if performance_by_sample_table is not None:
+        # Solo el tiempo TOTAL y la RAM MAXIMA por muestra entran a la tabla
+        # maestra; el desglose por modulo vive en performance_summary.tsv /
+        # performance_by_module.tsv (evita repetir aqui el mismo problema de
+        # "columnas dificiles de analizar" que ya se evito con los genes de AMR).
+        performance_columns = performance_by_sample_table[
+            ["sample_id", "total_elapsed_seconds", "peak_max_ram_gb"]
+        ]
+        master_table = master_table.merge(performance_columns, on="sample_id", how="left")
+
     available_qc_gate_columns = [
         column for column in QC_GATE_STATUS_COLUMNS if column in master_table.columns
     ]
@@ -170,6 +178,10 @@ def main() -> None:
     parser.add_argument(
         "--reference-comparison", type=Path, default=Path("results/tables/reference_comparison.tsv")
     )
+    parser.add_argument(
+        "--performance-by-sample", type=Path, default=Path("results/tables/performance_by_sample.tsv"),
+        help="Resumen de tiempo total / RAM maxima por muestra (ver combine_performance.py)",
+    )
     parser.add_argument("--output", type=Path, default=Path("results/tables/master_results.tsv"))
     args = parser.parse_args()
 
@@ -183,6 +195,7 @@ def main() -> None:
         load_optional_table(args.taxonomy_summary, "taxonomia (Kraken2)"),
         load_optional_table(args.amr_summary, "deteccion de AMR (AMRFinderPlus)"),
         load_optional_table(args.reference_comparison, "comparacion con el estandar de referencia"),
+        load_optional_table(args.performance_by_sample, "desempeño computacional"),
     )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)

@@ -11,10 +11,38 @@
 # se conectara al grafo completo cuando se arme el Snakefile principal.
 # ============================================================================
 
+rule combine_performance:
+    # Junta los registros de tiempo/CPU/RAM de cada ejecucion individual
+    # (results/tables/performance/{sample}_{module}.tsv, generados por
+    # run_with_timing.py) en un listado largo y dos resumenes derivados
+    # (por muestra y por modulo). Ver combine_performance.py para el detalle.
+    input:
+        performance_dir="results/tables/performance",
+    output:
+        summary="results/tables/performance_summary.tsv",
+        by_sample="results/tables/performance_by_sample.tsv",
+        by_module="results/tables/performance_by_module.tsv",
+    log:
+        "logs/combine_performance/combine.log",
+    conda:
+        "../envs/python.yaml"
+    shell:
+        """
+        python workflow/scripts/combine_performance.py \
+          --input-dir {input.performance_dir} \
+          --output {output.summary} \
+          --by-sample-output {output.by_sample} \
+          --by-module-output {output.by_module} \
+          > {log} 2>&1
+        """
+
+
 rule merge_results:
     # Combina los resultados de todos los modulos en una tabla maestra (una
     # fila por muestra). No mete el detalle gen-por-gen en columnas: eso
-    # sigue viviendo en la tabla larga de AMR (amr_summary.tsv).
+    # sigue viviendo en la tabla larga de AMR (amr_summary.tsv). Tampoco mete
+    # el desglose de tiempo/RAM por modulo: solo el total por muestra (ver
+    # combine_performance.py).
     input:
         samples=config["samples"],
         fastp_summary="results/tables/fastp_summary.tsv",
@@ -23,6 +51,7 @@ rule merge_results:
         taxonomy_summary="results/tables/taxonomy_summary.tsv",
         amr_summary="results/tables/amr_summary.tsv",
         reference_comparison="results/tables/reference_comparison.tsv",
+        performance_by_sample="results/tables/performance_by_sample.tsv",
     output:
         "results/tables/master_results.tsv",
     log:
@@ -39,6 +68,7 @@ rule merge_results:
           --taxonomy-summary {input.taxonomy_summary} \
           --amr-summary {input.amr_summary} \
           --reference-comparison {input.reference_comparison} \
+          --performance-by-sample {input.performance_by_sample} \
           --output {output} \
           > {log} 2>&1
         """

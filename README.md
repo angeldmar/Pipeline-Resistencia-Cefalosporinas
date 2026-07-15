@@ -79,7 +79,7 @@ ambientes Conda correspondientes (esto facilita ubicar el origen de cualquier er
 | 15 | Detección de AMR (AMRFinderPlus) | ✅ Hecho |
 | 16 | Comparación con estándar de referencia | ✅ Hecho |
 | 17 | Integración de resultados (tabla maestra) | ✅ Hecho |
-| 18 | Medición de desempeño computacional | ⏳ Pendiente |
+| 18 | Medición de desempeño computacional | ✅ Hecho |
 | 19 | Pruebas de reproducibilidad | ⏳ Pendiente |
 | 20 | Estadística en R | ⏳ Pendiente |
 | 21 | Generación de reportes HTML | ⏳ Pendiente |
@@ -562,7 +562,73 @@ todos los módulos: una que pasa todo (`PASS`), una que falla completitud vía
 CheckM (`EXCLUDED`), y una con cobertura límite (`WARNING`) — el resumen de
 AMR y la comparación de referencia coinciden correctamente en cada fila.
 
+### 18. Medición de desempeño computacional
+
+**Decisión de arquitectura:** el documento sugiere envolver cada comando con
+`/usr/bin/time -v` (GNU time). Esa variante `-v` es específica de GNU y no
+existe en macOS/BSD (el entorno de desarrollo de este proyecto), ni se puede
+asumir instalada en cualquier entorno de ejecución futuro. En su lugar se usó
+el módulo `resource` de la biblioteca estándar de Python, que mide lo mismo
+(tiempo, CPU, RAM máxima) de forma portable entre Linux y macOS, siguiendo el
+mismo principio ya usado en todo el pipeline: Python orquesta las
+herramientas externas, no depende de utilidades de shell específicas de una
+plataforma.
+
+**`workflow/scripts/run_with_timing.py`** (script nuevo) es un envoltorio
+genérico que se antepone a cualquier comando real:
+
+```
+python workflow/scripts/run_with_timing.py \
+  --sample-id EC001 --module spades --threads 8 \
+  --output results/tables/performance/EC001_spades.tsv \
+  -- spades.py -1 R1.fastq.gz -2 R2.fastq.gz -o outdir -t 8 --careful
+```
+
+Registra tiempo real, tiempo de CPU, RAM máxima (`resource.getrusage`),
+código de salida, fecha e hilos — los seis datos que pide la sección 16 — en
+un archivo por (muestra, módulo). Dos detalles importantes, ambos probados:
+
+- **El código de salida del comando real se propaga** como código de salida
+  del wrapper: si la herramienta envuelta falla, Snakemake debe seguir
+  detectando la regla como fallida, nunca "tragarse" el error solo porque ya
+  se registró la métrica.
+- **`ru_maxrss` cambia de unidad según el sistema operativo**: kilobytes en
+  Linux, bytes en macOS/BSD. Sin ese ajuste, la RAM quedaría sobrestimada
+  ~1000× en macOS. Se corrige detectando la plataforma (`platform.system()`).
+
+Se aplicó a las reglas "importantes" (con costo real de cómputo) de todos los
+módulos: `download_sample` (que además llenaba un hueco pendiente — nunca se
+había creado la regla de Snakemake para la descarga, solo se había probado
+por CLI), `fastp`, `spades`, `quast`, `checkm`, `kraken2`, `prokka`,
+`amrfinder`. Los pasos livianos (`filter_contigs`, los `parse_*`,
+`classify_cephalosporin_genes`, `compare_to_reference`) no se instrumentan,
+ya que no son el cuello de botella que esta medición busca identificar.
+
+**`workflow/scripts/combine_performance.py`** (script nuevo) junta todos los
+`results/tables/performance/{sample}_{module}.tsv` en tres tablas:
+`performance_summary.tsv` (listado largo, muestra+módulo — tal como pide la
+sección 16), `performance_by_sample.tsv` (tiempo **total** y RAM **máxima**
+por muestra) y `performance_by_module.tsv` (mismo par de métricas por
+módulo, para identificar el módulo más costoso — importante: el tiempo se
+**suma** entre módulos, pero la RAM se toma como el **máximo**, no la suma,
+porque los módulos de una misma muestra no corren simultáneamente).
+
+**`merge_results.py`** se extendió (resolviendo la nota pendiente que quedó
+de la parte 17) para incorporar `total_elapsed_seconds` y `peak_max_ram_gb`
+por muestra a la tabla maestra — el detalle por módulo se queda en las
+tablas de desempeño, mismo principio de "no ensanchar la tabla maestra" ya
+aplicado a los genes de AMR.
+
+Probado: el wrapper mide correctamente un comando de ~1s con asignación de
+memoria real, y propaga correctamente un código de salida 42 de un comando
+que falla a propósito. `combine_performance.py` probado con seis registros
+sintéticos de dos muestras: `total_elapsed_seconds` se suma correctamente
+entre módulos, `peak_max_ram_gb` toma el máximo (no la suma), y `spades` se
+identifica correctamente como el módulo más costoso. La tabla maestra
+extendida se probó de punta a punta con el mismo fixture de tres muestras de
+la parte 17, confirmando que las nuevas columnas no alteran `final_status`.
+
 ## Próximos pasos
 
-Continuar con la **parte 18**: medición de desempeño computacional (tiempo y
-memoria), sección 16 del diseño del pipeline.
+Continuar con la **parte 19**: pruebas de reproducibilidad (sección 17 del
+diseño del pipeline).

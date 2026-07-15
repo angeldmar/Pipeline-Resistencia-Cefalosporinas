@@ -26,7 +26,13 @@ rule spades:
         config["threads"]["spades"]
     shell:
         """
-        spades.py \
+        python workflow/scripts/run_with_timing.py \
+          --sample-id {wildcards.sample} \
+          --module spades \
+          --threads {threads} \
+          --output results/tables/performance/{wildcards.sample}_spades.tsv \
+          -- \
+          spades.py \
           -1 {input.r1} \
           -2 {input.r2} \
           -o {params.outdir} \
@@ -74,7 +80,13 @@ rule quast:
         config["threads"]["quast"]
     shell:
         """
-        quast.py {input} \
+        python workflow/scripts/run_with_timing.py \
+          --sample-id {wildcards.sample} \
+          --module quast \
+          --threads {threads} \
+          --output results/tables/performance/{wildcards.sample}_quast.tsv \
+          -- \
+          quast.py {input} \
           --output-dir {params.outdir} \
           --threads {threads} \
           > {log} 2>&1
@@ -134,7 +146,13 @@ rule checkm:
         mkdir -p {params.bin_dir}
         cp {input} {params.bin_dir}/{wildcards.sample}.fasta
         checkm data setRoot {params.database} > {log} 2>&1
-        checkm lineage_wf \
+        python workflow/scripts/run_with_timing.py \
+          --sample-id {wildcards.sample} \
+          --module checkm \
+          --threads {threads} \
+          --output results/tables/performance/{wildcards.sample}_checkm.tsv \
+          -- \
+          checkm lineage_wf \
           -x fasta \
           --tab_table \
           -f {output.report} \

@@ -22,7 +22,13 @@ rule fastp:
         config["threads"]["fastp"]
     shell:
         """
-        fastp \
+        python workflow/scripts/run_with_timing.py \
+          --sample-id {wildcards.sample} \
+          --module fastp \
+          --threads {threads} \
+          --output results/tables/performance/{wildcards.sample}_fastp.tsv \
+          -- \
+          fastp \
           --in1 {input.r1} \
           --in2 {input.r2} \
           --out1 {output.r1} \
