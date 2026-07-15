@@ -1,0 +1,11 @@
+# Ambiente para la regla quast (workflow/rules/assembly.smk).
+#
+# Incluye "python" ademas de quast: run_with_timing.py corre dentro de este
+# mismo ambiente y solo necesita la biblioteca estandar.
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python
+  - quast

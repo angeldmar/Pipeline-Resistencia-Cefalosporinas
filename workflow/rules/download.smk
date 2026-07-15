@@ -19,7 +19,7 @@ rule download_sample:
     log:
         "logs/download/{sample}.log",
     conda:
-        "../envs/python.yaml"
+        "../envs/sra_tools.yaml"
     threads:
         config["threads"]["download"]
     shell:

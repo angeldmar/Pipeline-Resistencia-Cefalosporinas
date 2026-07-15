@@ -1,0 +1,12 @@
+# Ambiente para la regla spades (workflow/rules/assembly.smk).
+#
+# Incluye "python" ademas de spades: run_with_timing.py (que envuelve el
+# comando spades.py para medir tiempo/CPU/RAM) corre dentro de este mismo
+# ambiente y solo necesita la biblioteca estandar.
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python
+  - spades

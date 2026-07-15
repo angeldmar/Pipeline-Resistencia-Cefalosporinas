@@ -1,0 +1,14 @@
+# Ambiente "generico" de analisis en Python: usado por todos los scripts de
+# validacion, parseo, agregacion, comparacion, integracion (tabla maestra) y
+# generacion de reportes -- todo lo que NO invoca directamente una
+# herramienta bioinformatica externa (esas tienen su propio ambiente, ver el
+# resto de los archivos en esta carpeta).
+channels:
+  - conda-forge
+dependencies:
+  - python
+  - pandas
+  - pyyaml
+  - biopython
+  - jinja2
+  - matplotlib

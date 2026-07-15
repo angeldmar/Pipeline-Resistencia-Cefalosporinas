@@ -1,0 +1,14 @@
+# Ambiente para la regla prokka (workflow/rules/annotation.smk).
+#
+# Incluye "python" ademas de prokka: run_with_timing.py corre dentro de
+# este mismo ambiente y solo necesita la biblioteca estandar. Prokka trae
+# ademas sus propias dependencias externas (blast+, aragorn, barrnap,
+# prodigal, hmmer, etc.) resueltas automaticamente por conda al instalar el
+# paquete "prokka" de bioconda.
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python
+  - prokka

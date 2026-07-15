@@ -1,0 +1,11 @@
+# Ambiente para la regla amrfinder (workflow/rules/amr_detection.smk).
+#
+# Incluye "python" ademas de ncbi-amrfinderplus: run_with_timing.py corre
+# dentro de este mismo ambiente y solo necesita la biblioteca estandar.
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python
+  - ncbi-amrfinderplus

@@ -21,6 +21,14 @@ wrapper, asi que la redireccion ">{log} 2>&1" que ya usan las reglas de
 Snakemake lo sigue capturando sin cambios). El codigo de salida del comando
 real se propaga como codigo de salida de este script, para que Snakemake
 detecte correctamente si la regla fallo.
+
+IMPORTANTE sobre dependencias: este script se ejecuta DENTRO del ambiente
+conda de la herramienta que envuelve (fastp, spades, checkm, etc.), no en el
+ambiente "python" del pipeline -- Snakemake solo activa un ambiente conda
+por regla. Por eso usa unicamente la biblioteca estandar de Python (modulo
+csv en vez de pandas): asi cada ambiente de herramienta solo necesita
+agregar "python" a sus dependencias, sin tener que agregar pandas (y sus
+propias dependencias transitivas) a los 8 ambientes distintos.
 """
 
 from __future__ import annotations
@@ -28,13 +36,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 import argparse
+import csv
 import platform
 import resource
 import subprocess
 import sys
 import time
-
-import pandas as pd
 
 PERFORMANCE_LOG_COLUMNS = [
     "sample_id",
@@ -97,7 +104,10 @@ def write_performance_row(
         "run_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame([performance_row], columns=PERFORMANCE_LOG_COLUMNS).to_csv(output_path, sep="\t", index=False)
+    with open(output_path, "w", newline="") as output_file:
+        writer = csv.DictWriter(output_file, fieldnames=PERFORMANCE_LOG_COLUMNS, delimiter="\t")
+        writer.writeheader()
+        writer.writerow(performance_row)
 
 
 def main() -> None:

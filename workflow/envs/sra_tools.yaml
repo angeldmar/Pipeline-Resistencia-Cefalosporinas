@@ -1,0 +1,17 @@
+# Ambiente para la regla download_sample (workflow/rules/download.smk).
+#
+# Archivo nuevo, no estaba en la lista original de ambientes del diseno del
+# pipeline: download_data.py invoca "fasterq-dump" via subprocess, y
+# Snakemake solo activa UN ambiente conda por regla, asi que sra-tools debe
+# vivir en el mismo ambiente que pandas (que usa download_data.py) en vez de
+# en python.yaml -- eso mezclaria una herramienta externa con el ambiente
+# "generico" de analisis, rompiendo el principio de un ambiente por
+# herramienta que pide la seccion 21 del diseno del pipeline.
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python
+  - pandas
+  - sra-tools

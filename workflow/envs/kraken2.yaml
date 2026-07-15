@@ -1,0 +1,11 @@
+# Ambiente para la regla kraken2 (workflow/rules/taxonomy.smk).
+#
+# Incluye "python" ademas de kraken2: run_with_timing.py corre dentro de
+# este mismo ambiente y solo necesita la biblioteca estandar.
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python
+  - kraken2

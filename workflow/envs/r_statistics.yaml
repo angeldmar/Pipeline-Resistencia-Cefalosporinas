@@ -1,0 +1,17 @@
+# Ambiente para la regla run_statistics (workflow/rules/statistics.smk).
+#
+# r-stringi se agrega explicitamente: al instalar estos paquetes via
+# install.packages() (fuera de conda, directo en el R del sistema) durante
+# las pruebas de la parte 20, faltaba como dependencia transitiva de caret y
+# el import de la libreria fallaba con "no package called stringi" hasta
+# instalarla aparte. Se deja fijada aqui para que quien recree este ambiente
+# via conda no se tope con el mismo problema.
+channels:
+  - conda-forge
+dependencies:
+  - r-base
+  - r-readr
+  - r-caret
+  - r-irr
+  - r-ggplot2
+  - r-stringi

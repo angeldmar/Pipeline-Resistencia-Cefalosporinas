@@ -1,0 +1,14 @@
+# Ambiente para la regla checkm (workflow/rules/assembly.smk).
+#
+# checkm-genome trae su propia version de Python como dependencia interna;
+# se agrega "python" explicitamente igual, para que run_with_timing.py
+# (que envuelve "checkm lineage_wf" dentro de este mismo ambiente) tenga
+# garantizado un interprete disponible sin depender de que quede expuesto
+# por casualidad via las dependencias transitivas de checkm-genome.
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python
+  - checkm-genome

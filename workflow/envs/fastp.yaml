@@ -1,0 +1,13 @@
+# Ambiente para la regla fastp (workflow/rules/quality_control.smk).
+#
+# Incluye "python" (sin paquetes extra) ademas de fastp: la regla envuelve
+# el comando con run_with_timing.py, que se ejecuta DENTRO de este mismo
+# ambiente (Snakemake solo activa un ambiente por regla) y solo necesita la
+# biblioteca estandar de Python, no pandas ni otros paquetes.
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python
+  - fastp

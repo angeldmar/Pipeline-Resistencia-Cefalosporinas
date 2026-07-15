@@ -84,7 +84,7 @@ ambientes Conda correspondientes (esto facilita ubicar el origen de cualquier er
 | 20 | Estadística en R | ✅ Hecho |
 | 21 | Generación de reportes HTML | ✅ Hecho |
 | 22 | Snakefile principal y reglas de Snakemake | ✅ Hecho |
-| 23 | Ambientes Conda | ⏳ Pendiente |
+| 23 | Ambientes Conda | ✅ Hecho |
 | 24 | Pruebas (unitarias, integración, e2e, negativas) | ⏳ Pendiente |
 
 ## Detalle de lo implementado
@@ -852,8 +852,63 @@ reales) que los valores de `config.yaml` se sustituyen correctamente en los
 comandos generados (ej. `--length_required 50 --qualified_quality_phred 20`
 coincide exactamente con `quality.minimum_length` / `quality.minimum_phred`).
 
+### 23. Ambientes Conda
+
+**Simplificación previa necesaria:** `run_with_timing.py` (parte 18) usaba
+`pandas`, pero se ejecuta *dentro* del ambiente conda de cada herramienta
+que envuelve (fastp, spades, checkm, etc.), no dentro de `python.yaml` —
+Snakemake solo activa un ambiente por regla. Eso habría obligado a agregar
+`pandas` (y sus dependencias transitivas) a los 8 ambientes de herramientas,
+además del propio `python.yaml`. Se reescribió para usar únicamente el
+módulo `csv` de la biblioteca estándar; ahora cada ambiente de herramienta
+solo necesita agregar `python` (ligero, sin dependencias extra). Re-probado
+tras el cambio: mismo comportamiento exacto que antes.
+
+**9 archivos `workflow/envs/*.yaml`** completados (7 existían vacíos + 2
+nuevos): `python.yaml` (paquetes de análisis general: pandas, pyyaml,
+biopython, jinja2, matplotlib), `fastp.yaml`, `spades.yaml`, `quast.yaml`,
+`checkm.yaml`, `kraken2.yaml`, `prokka.yaml`, `amrfinder.yaml` (cada uno con
+su herramienta + `python` para `run_with_timing.py`), **`sra_tools.yaml`**
+(nuevo — `download_data.py` invoca `fasterq-dump`, que necesita vivir en el
+mismo ambiente que `pandas`, no mezclado en `python.yaml`, para respetar el
+principio de "un ambiente por herramienta" también para la descarga) y
+`r_statistics.yaml` (incluye `r-stringi` explícitamente, la dependencia
+transitiva de `caret` que faltó instalar sola en la parte 20).
+
+**Hallazgo importante de compatibilidad de plataforma:** al verificar los
+nombres de paquete contra los índices reales de bioconda (sin instalar, solo
+consultando su API), encontré que **QUAST, CheckM (`checkm-genome`) y Prokka
+no tienen compilaciones para `osx-arm64`** (Apple Silicon — la arquitectura
+de esta Mac y, cada vez más, la más común entre desarrolladores). Sí existen
+para `osx-64` (Intel) y `linux-64`. Esto significa que `snakemake --use-conda`
+fallaría al intentar crear esos tres ambientes en esta máquina tal cual.
+
+*Solución práctica estándar para este caso* (bien establecida en la
+comunidad de bioinformática para Apple Silicon): forzar a conda a resolver
+paquetes `osx-64` y ejecutarlos vía la emulación Rosetta 2, con la variable
+de entorno `CONDA_SUBDIR`:
+
+```bash
+CONDA_SUBDIR=osx-64 snakemake --use-conda --cores 8 --rerun-incomplete --printshellcmds
+```
+
+Esto aplica la emulación a *todos* los ambientes por simplicidad (incluidos
+los que sí tienen build nativo arm64, con un costo menor de rendimiento en
+esos casos). La alternativa real para producción — y la más alineada con
+cómo se plantea usar este pipeline en la práctica (sección 23 del diseño:
+"Ejecutar el conjunto independiente de evaluación") — es correr el pipeline
+en Linux (contenedor, VM, o un clúster/HPC), donde bioconda tiene
+compilaciones completas para las tres herramientas sin necesidad de emulación.
+
+**Probado:** sintaxis YAML válida en los 9 archivos (parseados con
+`yaml.safe_load`), y los 8 nombres de paquete bioconda (`fastp`, `spades`,
+`quast`, `checkm-genome`, `kraken2`, `prokka`, `ncbi-amrfinderplus`,
+`sra-tools`) confirmados como existentes consultando la API de anaconda.org
+— no se ejecutó `conda env create` de verdad (decisión tomada con el
+usuario: los ambientes bioconda más pesados pueden tardar varios minutos
+cada uno en resolver, sin necesidad real de verificarlo en este momento).
+
 ## Próximos pasos
 
-Continuar con la **parte 23**: ambientes Conda (los archivos `workflow/envs/*.yaml`
-siguen vacíos; hace falta llenarlos para poder ejecutar el pipeline con
-herramientas bioinformáticas reales, no solo validar su estructura).
+Continuar con la **parte 24**: pruebas (unitarias, integración, extremo a
+extremo, negativas) — sección 22 del diseño del pipeline.
