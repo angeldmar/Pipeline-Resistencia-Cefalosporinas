@@ -1,7 +1,8 @@
 # ============================================================================
 # assembly.smk
-# Ensamblaje genomico de novo con SPAdes, y filtrado de contigs cortos antes
-# de evaluar el ensamblaje (QUAST) o buscar genes de resistencia (AMRFinderPlus).
+# Ensamblaje genomico de novo con SPAdes, filtrado de contigs cortos, y
+# evaluacion del ensamblaje con QUAST (numero de contigs, N50, longitud
+# total, contenido GC) con clasificacion automatica PASS/WARNING/FAIL.
 # ============================================================================
 
 rule spades:
@@ -50,5 +51,57 @@ rule filter_contigs:
         """
         python workflow/scripts/filter_contigs.py {input} {output} \
           --minimum-length {config[assembly][minimum_contig_length]} \
+          > {log} 2>&1
+        """
+
+
+rule quast:
+    # Evalua el ensamblaje filtrado con QUAST: numero de contigs, N50,
+    # longitud total, contig mas largo y contenido GC.
+    input:
+        "results/assemblies/{sample}/contigs.filtered.fasta",
+    output:
+        report="results/qc/quast/{sample}/report.tsv",
+    params:
+        outdir="results/qc/quast/{sample}",
+    log:
+        "logs/quast/{sample}.log",
+    conda:
+        "../envs/quast.yaml"
+    threads:
+        config["threads"]["quast"]
+    shell:
+        """
+        quast.py {input} \
+          --output-dir {params.outdir} \
+          --threads {threads} \
+          > {log} 2>&1
+        """
+
+
+rule parse_quast:
+    # Extrae del report.tsv de QUAST las metricas clave del ensamblaje y lo
+    # clasifica en PASS/WARNING/FAIL segun los umbrales de config.yaml.
+    #
+    # Igual que en parse_fastp, se escribe un archivo POR MUESTRA (no se
+    # acumula directamente en un unico quast_summary.tsv) para evitar
+    # condiciones de carrera cuando varias muestras corren en paralelo. La
+    # tabla combinada se arma en un paso de agregacion aparte.
+    input:
+        "results/qc/quast/{sample}/report.tsv",
+    output:
+        "results/tables/quast/{sample}.tsv",
+    log:
+        "logs/parse_quast/{sample}.log",
+    conda:
+        "../envs/python.yaml"
+    shell:
+        """
+        python workflow/scripts/parse_quast.py parse {wildcards.sample} {input} \
+          --output-dir results/tables/quast \
+          --maximum-contigs {config[assembly][maximum_contigs]} \
+          --minimum-total-length {config[assembly][minimum_total_length]} \
+          --maximum-total-length {config[assembly][maximum_total_length]} \
+          --n50-warning-threshold {config[assembly][n50_warning_threshold]} \
           > {log} 2>&1
         """

@@ -72,7 +72,7 @@ ambientes Conda correspondientes (esto facilita ubicar el origen de cualquier er
 | 8 | Control de calidad de lecturas (fastp) | ✅ Hecho |
 | 9 | Verificación de cobertura | ✅ Hecho |
 | 10 | Ensamblaje genómico (SPAdes) | ✅ Hecho |
-| 11 | Evaluación del ensamblaje (QUAST) | ⏳ Pendiente |
+| 11 | Evaluación del ensamblaje (QUAST) | ✅ Hecho |
 | 12 | Completitud y contaminación | ⏳ Pendiente |
 | 13 | Identificación taxonómica (Kraken2) | ⏳ Pendiente |
 | 14 | Anotación genómica | ⏳ Pendiente |
@@ -256,7 +256,47 @@ un caso límite de exactamente 500 pb): retiene correctamente los 3 contigs
 ≥500 pb y descarta los 2 cortos. También probado el caso extremo de un
 ensamblaje sin ningún contig válido: no falla, solo emite la advertencia.
 
+### 11. Evaluación del ensamblaje (QUAST)
+
+Se agregaron dos reglas más a **`workflow/rules/assembly.smk`** (QUAST evalúa
+directamente la salida de `filter_contigs`, así que se mantiene en el mismo
+archivo en vez de crear uno nuevo):
+
+- `quast`: corre QUAST sobre `contigs.filtered.fasta` y genera
+  `results/qc/quast/{sample}/report.tsv` (junto con el resto de los reportes
+  de QUAST en esa misma carpeta).
+- `parse_quast`: llama a `parse_quast.py parse` sobre ese `report.tsv`.
+
+**`workflow/scripts/parse_quast.py`** sigue el mismo patrón que
+`parse_fastp.py` (subcomandos `parse`/`combine`, archivo por muestra para
+evitar condiciones de carrera en Snakemake). Extrae de QUAST: número de
+contigs, contig más largo, longitud total, % GC y N50, y clasifica el
+ensamblaje con `classify_assembly()`:
+
+- **FAIL** si hay más contigs que `assembly.maximum_contigs`, o si la
+  longitud total cae fuera del rango `[minimum_total_length,
+  maximum_total_length]` esperado para *E. coli* — en ambos casos sin
+  importar qué tan bueno sea el N50.
+- **WARNING** si el N50 es menor a `assembly.n50_warning_threshold`
+  (ensamblaje más fragmentado de lo ideal, pero utilizable).
+- **PASS** en cualquier otro caso.
+
+Todos estos umbrales vienen de `config.yaml` (ya centralizados desde la parte
+4), no están fijos en el script.
+
+**Nota técnica:** QUAST repite varias métricas con distintos umbrales de
+longitud en el mismo `report.tsv` (ej. `# contigs (>= 1000 bp)` junto a
+`# contigs` a secas). El parser usa coincidencia exacta de nombre de fila
+(`# contigs`, `Total length`, `N50`, etc.) para no confundir la métrica
+global del ensamblaje con las variantes filtradas por longitud.
+
+Probado con tres `report.tsv` sintéticos (formato real de QUAST) que
+representan los tres estados: uno con pocos contigs y N50 alto (PASS), uno
+con N50 bajo pero todo lo demás normal (WARNING), y uno con exceso de
+contigs a pesar de tener un N50 razonable, confirmando que el criterio FAIL
+tiene prioridad sobre WARNING.
+
 ## Próximos pasos
 
-Continuar con la **parte 11**: evaluación del ensamblaje con QUAST (sección 9
-del diseño del pipeline).
+Continuar con la **parte 12**: completitud y contaminación del ensamblaje
+(sección 10 del diseño del pipeline).
