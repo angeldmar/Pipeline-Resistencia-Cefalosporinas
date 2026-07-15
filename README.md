@@ -77,7 +77,7 @@ ambientes Conda correspondientes (esto facilita ubicar el origen de cualquier er
 | 13 | Identificación taxonómica (Kraken2) | ✅ Hecho |
 | 14 | Anotación genómica (Prokka) | ✅ Hecho |
 | 15 | Detección de AMR (AMRFinderPlus) | ✅ Hecho |
-| 16 | Comparación con estándar de referencia | ⏳ Pendiente |
+| 16 | Comparación con estándar de referencia | ✅ Hecho |
 | 17 | Integración de resultados (tabla maestra) | ⏳ Pendiente |
 | 18 | Medición de desempeño computacional | ⏳ Pendiente |
 | 19 | Pruebas de reproducibilidad | ⏳ Pendiente |
@@ -457,7 +457,63 @@ Probado con AMRFinderPlus sintético cubriendo los casos clave:
   `meets_identity_coverage_threshold=False`, no se pierde.
 - Una muestra sin genes detectados → tabla vacía sin error.
 
+### 16. Comparación con el estándar de referencia
+
+**`workflow/scripts/compare_to_reference.py`** (script nuevo) arma, por
+muestra, la matriz TP/TN/FP/FN que R usará después para calcular
+sensibilidad/especificidad/kappa — **ningún cálculo estadístico se hace
+aquí**, solo se prepara y clasifica la matriz de datos, tal como pide el
+documento. Compara `expected_genes` de `samples.tsv` contra los genes
+detectados con confianza (`meets_identity_coverage_threshold=True`) en
+`amr_summary.tsv`:
+
+- Coincidencia **exacta** de alelo → `TP`.
+- Coincidencia de **familia** pero alelo distinto al de referencia (ej. se
+  esperaba `blaCTX-M-15` y se detectó `blaCTX-M-27`) → sigue contando como
+  detección positiva (`TP`), pero queda registrado en `match_type=family`
+  para que se note que el alelo exacto no coincidió.
+- `expected_genes="none"` sin genes beta-lactámicos detectados → `TN`; si
+  aparece alguno inesperado → `FP`.
+- Gen esperado no detectado → `FN`.
+- **`Indeterminado`** (quinta categoría que pide la sección 14, más allá del
+  ejemplo de `confusion_category()` del documento): cuando `expected_genes`
+  está vacío o `NA` — es decir, no hay estándar de referencia documentado
+  para esa muestra — en vez de forzar una comparación sin sentido.
+
+**Alcance deliberadamente limitado por ahora:** esta comparación es
+únicamente a nivel de gen. Todavía no considera si la muestra falló algún
+control de calidad anterior (cobertura, ensamblaje, taxonomía,
+completitud) — esa integración le corresponde a la tabla maestra
+(`merge_results.py`, parte 17), que es la que tiene visibilidad de todos los
+módulos a la vez. Lo dejo anotado explícitamente para no perderlo de vista.
+
+**Bug encontrado y corregido durante las pruebas:** la primera versión trataba
+`reference_positive` con `if reference_positive:`, y como `None` (el caso
+indeterminado) también evalúa como falso en Python, cualquier muestra sin
+referencia caía silenciosamente en la rama de "no se esperaba ningún gen" en
+vez de su propia rama. Se corrigió comparando explícitamente los tres
+estados (`is None` / verdadero / falso). De paso también apareció el mismo
+problema de `pandas` leyendo el texto `"NA"` como valor nulo real (ya
+resuelto antes en `validate_samples.py` con `.fillna("NA")`, pero no estaba
+aplicado en este script nuevo) — corregido de la misma forma.
+
+**Nota sobre el grafo de Snakemake:** las reglas `classify_cephalosporin_genes`
+y `compare_to_reference` (agregadas a `amr_detection.smk`) dependen de
+`results/tables/amr_summary.tsv`, que se arma juntando la tabla de *todas*
+las muestras (`parse_amrfinder.py combine`). Esa regla de "combinar todas las
+muestras" necesita la lista completa de muestras (`SAMPLES`), que recién
+queda definida al construir el Snakefile principal — así que, por ahora,
+`amr_summary.tsv` (y los demás `*_summary.tsv` de los módulos anteriores) se
+generan manualmente vía CLI, y se conectarán al grafo completo cuando se
+arme el Snakefile principal.
+
+Probado: coincidencia exacta (TP), coincidencia por familia con alelo
+distinto (TP, `match_type=family`), gen esperado no detectado (FN), ausencia
+de gen confirmada (TN), y referencia indeterminada con detección real
+(`Indeterminado`, con el gen detectado igual visible en la tabla en vez de
+perderse).
+
 ## Próximos pasos
 
-Continuar con la **parte 16**: comparación con el estándar de referencia
-(sección 14 del diseño del pipeline).
+Continuar con la **parte 17**: integración de resultados / tabla maestra
+(sección 15 del diseño del pipeline).
