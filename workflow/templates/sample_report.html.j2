@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Reporte {{ sample_id }} — Pipeline AMR E. coli</title>
+<style>
+  body { font-family: -apple-system, Helvetica, Arial, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
+  h1 { border-bottom: 3px solid #2c5f8a; padding-bottom: 0.4rem; }
+  h2 { color: #2c5f8a; border-bottom: 1px solid #ccc; padding-bottom: 0.2rem; margin-top: 2rem; }
+  table { border-collapse: collapse; width: 100%; margin: 0.8rem 0; }
+  th, td { border: 1px solid #ddd; padding: 0.4rem 0.6rem; text-align: left; font-size: 0.92rem; }
+  th { background-color: #f0f4f8; }
+  .status-PASS { color: #1a7a3c; font-weight: bold; }
+  .status-WARNING { color: #b8860b; font-weight: bold; }
+  .status-FAIL, .status-EXCLUDED { color: #b02a2a; font-weight: bold; }
+  .status-PENDING { color: #777; font-weight: bold; }
+  .warning-box { background-color: #fff8e1; border-left: 4px solid #b8860b; padding: 0.8rem 1rem; margin: 0.8rem 0; }
+  .disclaimer-box { background-color: #f0f4f8; border-left: 4px solid #2c5f8a; padding: 0.8rem 1rem; margin: 1.5rem 0; font-size: 0.92rem; }
+  .interpretation-list li { margin-bottom: 0.5rem; }
+  code { background-color: #f0f0f0; padding: 0.1rem 0.3rem; border-radius: 3px; }
+  footer { margin-top: 3rem; font-size: 0.8rem; color: #777; border-top: 1px solid #ddd; padding-top: 0.8rem; }
+</style>
+</head>
+<body>
+
+<h1>Reporte de análisis: {{ sample_id }}</h1>
+<p><strong>Estado final:</strong> <span class="status-{{ final_status }}">{{ final_status }}</span></p>
+
+<div class="disclaimer-box">
+  Este informe describe <strong>hallazgos genotípicos</strong> obtenidos mediante un pipeline
+  bioinformático de investigación. No constituye un diagnóstico clínico ni debe usarse para
+  decisiones de tratamiento sin validación adicional independiente.
+</div>
+
+<h2>Identificador y accesiones</h2>
+<table>
+  <tr><th>Sample ID</th><td>{{ sample_id }}</td></tr>
+  <tr><th>Run accession</th><td>{{ run_accession }}</td></tr>
+  <tr><th>BioSample</th><td>{{ biosample }}</td></tr>
+  <tr><th>Plataforma de secuenciación</th><td>{{ sequencing_platform }}</td></tr>
+  <tr><th>Fuente de los datos</th><td>{{ data_source }}</td></tr>
+</table>
+
+<h2>Calidad de lecturas (fastp)</h2>
+<table>
+  <tr><th>Lecturas iniciales</th><td>{{ initial_reads }}</td></tr>
+  <tr><th>Lecturas retenidas</th><td>{{ retained_reads }}</td></tr>
+  <tr><th>% lecturas filtradas</th><td>{{ filtered_reads_percent }}%</td></tr>
+  <tr><th>Bases Q20 / Q30</th><td>{{ q20_bases }} / {{ q30_bases }}</td></tr>
+  <tr><th>Contenido GC (lecturas)</th><td>{{ reads_gc_content_percent }}%</td></tr>
+  <tr><th>% duplicación</th><td>{{ duplication_rate_percent }}%</td></tr>
+</table>
+
+<h2>Cobertura</h2>
+<table>
+  <tr><th>Cobertura estimada</th><td>{{ estimated_coverage }}x</td></tr>
+  <tr><th>Estado</th><td class="status-{{ coverage_status }}">{{ coverage_status }}</td></tr>
+</table>
+
+<h2>Ensamblaje (SPAdes / QUAST)</h2>
+<table>
+  <tr><th>Contigs</th><td>{{ contigs }}</td></tr>
+  <tr><th>Contig más largo</th><td>{{ largest_contig }} pb</td></tr>
+  <tr><th>Longitud total</th><td>{{ total_length }} pb</td></tr>
+  <tr><th>N50</th><td>{{ n50 }} pb</td></tr>
+  <tr><th>Contenido GC (ensamblaje)</th><td>{{ assembly_gc_content_percent }}%</td></tr>
+  <tr><th>Estado</th><td class="status-{{ assembly_status }}">{{ assembly_status }}</td></tr>
+</table>
+
+<h2>Completitud y contaminación (CheckM)</h2>
+<table>
+  <tr><th>Completitud</th><td>{{ completeness_percent }}%</td></tr>
+  <tr><th>Contaminación</th><td>{{ contamination_percent }}%</td></tr>
+  <tr><th>Estado</th><td class="status-{{ completeness_status }}">{{ completeness_status }}</td></tr>
+</table>
+
+<h2>Identificación taxonómica (Kraken2)</h2>
+<table>
+  <tr><th>Taxón predominante</th><td><em>{{ predominant_taxon }}</em></td></tr>
+  <tr><th>% asignado a E. coli</th><td>{{ ecoli_percentage }}%</td></tr>
+  <tr><th>% Shigella (revisión manual aparte)</th><td>{{ shigella_percentage }}%</td></tr>
+  <tr><th>% otros contaminantes</th><td>{{ other_contaminant_percentage }}%</td></tr>
+  <tr><th>Estado</th><td class="status-{{ taxonomy_status }}">{{ taxonomy_status }}</td></tr>
+</table>
+
+<h2>Genes de resistencia detectados (AMRFinderPlus)</h2>
+{% if amr_genes %}
+<table>
+  <tr>
+    <th>Gen</th><th>Alelo</th><th>Clase</th><th>Subclase</th>
+    <th>% Identidad</th><th>% Cobertura</th><th>Categoría</th><th>Confiable</th>
+  </tr>
+  {% for gene in amr_genes %}
+  <tr>
+    <td><code>{{ gene.gene_symbol }}</code></td>
+    <td>{{ gene.allele }}</td>
+    <td>{{ gene.antimicrobial_class }}</td>
+    <td>{{ gene.antimicrobial_subclass }}</td>
+    <td>{{ gene.percent_identity }}%</td>
+    <td>{{ gene.percent_coverage }}%</td>
+    <td>{{ gene.beta_lactamase_category }}</td>
+    <td>{{ "Sí" if gene.meets_identity_coverage_threshold else "No (bajo umbral)" }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% if amr_chart_base64 %}
+<img src="data:image/png;base64,{{ amr_chart_base64 }}" alt="Identidad y cobertura de los genes detectados" style="max-width: 100%;">
+{% endif %}
+{% else %}
+<p>No se detectaron genes de resistencia con confianza suficiente en esta muestra.</p>
+{% endif %}
+
+<h2>Interpretación del mecanismo</h2>
+<p>Los siguientes enunciados describen determinantes genéticos detectados y su categoría
+mecanística asociada. <strong>No representan una conclusión clínica</strong> (ej. "resistente" o
+"susceptible"); esa interpretación requiere correlación con pruebas fenotípicas y criterio clínico.</p>
+{% if gene_interpretations %}
+<ul class="interpretation-list">
+  {% for sentence in gene_interpretations %}
+  <li>{{ sentence }}</li>
+  {% endfor %}
+</ul>
+{% else %}
+<p>No se identificaron determinantes de resistencia a beta-lactámicos en esta muestra.</p>
+{% endif %}
+
+<h2>Comparación con el estándar de referencia</h2>
+<table>
+  <tr><th>Gen esperado</th><td>{{ expected_genes }}</td></tr>
+  <tr><th>Gen detectado (referencia)</th><td>{{ reference_detected_gene }}</td></tr>
+  <tr><th>Tipo de coincidencia</th><td>{{ match_type }}</td></tr>
+  <tr><th>Categoría de comparación</th><td>{{ confusion_category }}</td></tr>
+</table>
+
+<h2>Advertencias</h2>
+{% if warnings %}
+{% for warning in warnings %}
+<div class="warning-box">{{ warning }}</div>
+{% endfor %}
+{% else %}
+<p>Sin advertencias registradas para esta muestra.</p>
+{% endif %}
+
+<h2>Desempeño computacional</h2>
+<table>
+  <tr><th>Tiempo total</th><td>{{ total_elapsed_seconds }} s</td></tr>
+  <tr><th>RAM máxima</th><td>{{ peak_max_ram_gb }} GB</td></tr>
+</table>
+{% if performance_by_module %}
+<table>
+  <tr><th>Módulo</th><th>Tiempo (s)</th><th>CPU (s)</th><th>RAM máxima (GB)</th></tr>
+  {% for row in performance_by_module %}
+  <tr><td>{{ row.module }}</td><td>{{ row.elapsed_seconds }}</td><td>{{ row.cpu_seconds }}</td><td>{{ row.max_ram_gb }}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<h2>Versiones de herramientas</h2>
+{% if tool_versions %}
+<table>
+  <tr><th>Herramienta</th><th>Versión</th></tr>
+  {% for tool_name, version in tool_versions.items() %}
+  <tr><td>{{ tool_name }}</td><td>{{ version }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No hay registro de versiones disponible (ejecutar capture_tool_versions.py).</p>
+{% endif %}
+
+<footer>
+  Generado por generate_report.py — pipeline de detección de resistencia a cefalosporinas de
+  tercera generación en <em>E. coli</em>. Fecha de generación: {{ generated_at }}.
+</footer>
+
+</body>
+</html>

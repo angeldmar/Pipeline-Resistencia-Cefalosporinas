@@ -82,7 +82,7 @@ ambientes Conda correspondientes (esto facilita ubicar el origen de cualquier er
 | 18 | Medición de desempeño computacional | ✅ Hecho |
 | 19 | Pruebas de reproducibilidad | ✅ Hecho |
 | 20 | Estadística en R | ✅ Hecho |
-| 21 | Generación de reportes HTML | ⏳ Pendiente |
+| 21 | Generación de reportes HTML | ✅ Hecho |
 | 22 | Snakefile principal y reglas de Snakemake | ⏳ Pendiente |
 | 23 | Ambientes Conda | ⏳ Pendiente |
 | 24 | Pruebas (unitarias, integración, e2e, negativas) | ⏳ Pendiente |
@@ -716,7 +716,64 @@ al revisar el gráfico generado (las celdas con conteo bajo eran casi
 invisibles con un gradiente que partía de blanco puro), se cambió la escala
 de color para que toda celda sea visible independientemente de su conteo.
 
+### 21. Generación de reportes HTML
+
+**Vacío cerrado antes de empezar:** ningún módulo capturaba la versión de las
+herramientas externas (salvo Prokka, ya resuelto en la parte 14), y la
+sección 19 exige "Versiones" en cada reporte. Se agregó
+**`workflow/scripts/capture_tool_versions.py`** (script nuevo): a diferencia
+de las métricas de desempeño (una fila por muestra y módulo), la versión de
+una herramienta no cambia entre muestras dentro de una misma corrida, así que
+este script se ejecuta **una sola vez por corrida** (no por muestra) y deja
+`data/metadata/tool_versions.tsv`. Probado: como ninguna herramienta bio
+está instalada en este entorno, todas quedan registradas como
+`"not installed"` en vez de hacer fallar el script — la versión es un dato
+de trazabilidad, no debe bloquear el pipeline.
+
+**`workflow/templates/sample_report.html.j2`** (carpeta y plantilla nuevas,
+no estaban en la estructura fija) es una plantilla Jinja2 con las secciones
+exactas que pide la sección 19: identificador/accesiones, calidad de lecturas
+(inicial/posterior), cobertura, ensamblaje, taxonomía, completitud/
+contaminación, genes detectados (con gráfico embebido), interpretación del
+mecanismo, comparación con la referencia, advertencias, desempeño (tiempo y
+memoria, total y por módulo) y versiones de herramientas — con un aviso fijo
+al inicio de que el reporte no es un diagnóstico clínico.
+
+**`workflow/scripts/generate_report.py`** arma el contexto (uniendo la fila
+de la muestra en `master_results.tsv`, sus genes en `amr_classified.tsv`, su
+desempeño por módulo, y las versiones de herramientas) y renderiza la
+plantilla. Cada reporte es un **HTML autocontenido**: el gráfico de
+identidad/cobertura por gen (Matplotlib) se embebe directamente como
+imagen en base64, sin archivos `.png` sueltos.
+
+**Regla de alcance respetada literalmente (la más importante de esta
+parte):** `build_gene_interpretation_sentences()` nunca genera una
+conclusión clínica tipo "Aislado resistente a ceftriaxona". Para cada gen
+detectado con confianza, construye una oración con el patrón exacto que pide
+el documento: *"Se detectó el determinante blaCTX-M-15, asociado con
+beta-lactamasas de espectro extendido (BLEE)..."* — usando la categoría
+mecanística ya calculada en la parte 15 (`beta_lactamase_category`), así que
+`blaTEM-1` (clasificado como `Other`, no `ESBL`) recibe una interpretación
+distinta a `blaCTX-M-15`, en vez de asumir que toda beta-lactamasa detectada
+es una BLEE.
+
+Probado de extremo a extremo con `EC001` (3 genes: `blaCTX-M-15` confiable,
+`blaTEM-1` confiable, `aac(3)-IId` por debajo del umbral de confianza):
+
+- Verificación automática de que el HTML generado **no contiene** ninguna
+  frase de conclusión clínica prohibida (`"aislado resistente"`, etc.).
+- `blaCTX-M-15` recibe la interpretación BLEE; `blaTEM-1` recibe la
+  interpretación genérica "Other" (no BLEE) — confirma que la regla central
+  de la parte 15 se propaga correctamente hasta el reporte final.
+- `aac(3)-IId` (bajo el umbral) queda excluido de la interpretación pero sí
+  aparece listado en advertencias, sin desaparecer silenciosamente.
+- Gráfico embebido en base64 presente en el HTML.
+- Probado también el caso sin genes detectados (`EC002`): ambas ramas
+  condicionales de la plantilla ("no se detectaron genes...") funcionan.
+
 ## Próximos pasos
 
-Continuar con la **parte 21**: generación de reportes HTML (sección 19 del
-diseño del pipeline).
+Continuar con la **parte 22**: Snakefile principal (sección 20 del diseño
+del pipeline) — incluye conectar las reglas de agregación (`combine_*`,
+`merge_results`, `run_statistics`) que hasta ahora se ejecutan manualmente
+porque dependían de la lista `SAMPLES`.

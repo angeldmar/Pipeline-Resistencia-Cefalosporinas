@@ -72,3 +72,49 @@ rule merge_results:
           --output {output} \
           > {log} 2>&1
         """
+
+
+rule capture_tool_versions:
+    # Registra, UNA sola vez por corrida (no por muestra: la version de una
+    # herramienta no cambia entre muestras), las versiones instaladas de
+    # cada herramienta externa del pipeline.
+    output:
+        "data/metadata/tool_versions.tsv",
+    log:
+        "logs/capture_tool_versions/capture.log",
+    conda:
+        "../envs/python.yaml"
+    shell:
+        """
+        python workflow/scripts/capture_tool_versions.py --output {output} > {log} 2>&1
+        """
+
+
+rule generate_report:
+    # Genera el reporte HTML individual de una muestra: identificador,
+    # calidad, cobertura, ensamblaje, taxonomia, completitud/contaminacion,
+    # genes de resistencia con su interpretacion GENOTIPICA (nunca una
+    # conclusion clinica), comparacion con la referencia, desempeno y
+    # versiones de herramientas. Ver generate_report.py.
+    input:
+        master_results="results/tables/master_results.tsv",
+        amr_classified="results/tables/amr_classified.tsv",
+        performance_summary="results/tables/performance_summary.tsv",
+        tool_versions="data/metadata/tool_versions.tsv",
+    output:
+        "results/reports/{sample}.html",
+    log:
+        "logs/generate_report/{sample}.log",
+    conda:
+        "../envs/python.yaml"
+    shell:
+        """
+        python workflow/scripts/generate_report.py \
+          --sample-id {wildcards.sample} \
+          --master-results {input.master_results} \
+          --amr-classified {input.amr_classified} \
+          --performance-summary {input.performance_summary} \
+          --tool-versions {input.tool_versions} \
+          --output {output} \
+          > {log} 2>&1
+        """
