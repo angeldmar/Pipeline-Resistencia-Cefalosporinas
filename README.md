@@ -74,7 +74,7 @@ ambientes Conda correspondientes (esto facilita ubicar el origen de cualquier er
 | 10 | Ensamblaje genómico (SPAdes) | ✅ Hecho |
 | 11 | Evaluación del ensamblaje (QUAST) | ✅ Hecho |
 | 12 | Completitud y contaminación (CheckM) | ✅ Hecho |
-| 13 | Identificación taxonómica (Kraken2) | ⏳ Pendiente |
+| 13 | Identificación taxonómica (Kraken2) | ✅ Hecho |
 | 14 | Anotación genómica | ⏳ Pendiente |
 | 15 | Detección de AMR (AMRFinderPlus) | ⏳ Pendiente |
 | 16 | Comparación con estándar de referencia | ⏳ Pendiente |
@@ -332,7 +332,46 @@ falla solo por contaminación alta — ambos modos de fallo se detectan por
 separado correctamente, y el registro de exclusiones lista ambos con su
 motivo sin que desaparezcan del resumen combinado.
 
+### 13. Identificación taxonómica (Kraken2)
+
+**`workflow/rules/taxonomy.smk`** (archivo nuevo) define dos reglas:
+
+- `kraken2`: clasifica taxonómicamente las lecturas ya recortadas
+  (`results/trimmed/`) contra la base de datos de referencia
+  (`paths.kraken_database`). Se corre sobre lecturas, no sobre el ensamblaje,
+  que es el uso estándar de Kraken2 y evita que un ensamblaje ya colapsado
+  enmascare una mezcla de especies.
+- `parse_kraken2`: llama a `parse_kraken2.py parse` sobre el reporte.
+
+**`workflow/scripts/parse_kraken2.py`** (script nuevo) extrae: taxón
+predominante, % asignado a *E. coli*, y % de otras especies (contaminación),
+y clasifica con `classify_taxonomy()` — misma lógica del documento (PASS si
+≥90% *E. coli* y <5% contaminantes; WARNING si ≥70% *E. coli*; FAIL en el
+resto), con los umbrales en `config.yaml` (`taxonomy.*`, ya centralizados
+desde la parte 4).
+
+**Regla de revisión manual para *Shigella*** (sección 11, requisito explícito
+del documento): *Shigella* es genómicamente tan cercana a *E. coli* que
+históricamente se consideraron la misma especie. Si Kraken2 asigna lecturas a
+*Shigella*, el script **no** las suma al porcentaje de "otras especies" que
+dispararía un FAIL — en vez de eso, marca `requires_manual_review=True` y dejo
+un registro aparte (`results/tables/taxonomy_manual_review.tsv`) con esas
+muestras, para que un analista decida caso por caso. Esto implementa
+literalmente la instrucción del documento de no excluir automáticamente estos
+aislamientos sin revisión.
+
+Probado con tres reportes Kraken2 sintéticos (formato real, jerárquico):
+
+- 95% *E. coli* sin contaminantes → **PASS**.
+- 85% *E. coli* + 10% *Shigella* → **WARNING** (85% no alcanza el umbral PASS
+  de 90%, independientemente de Shigella) y queda marcada para revisión
+  manual — confirma que la regla de Shigella no "rescata" artificialmente el
+  puntaje, solo evita que se cuente como contaminación.
+- 40% *E. coli* con 45% *Klebsiella pneumoniae* → **FAIL**, y el taxón
+  predominante se identifica correctamente como *Klebsiella pneumoniae* (no
+  se asume que el taxón predominante sea siempre *E. coli*).
+
 ## Próximos pasos
 
-Continuar con la **parte 13**: identificación taxonómica con Kraken2 (sección
-11 del diseño del pipeline).
+Continuar con la **parte 14**: anotación genómica (sección 12 del diseño del
+pipeline).
