@@ -78,7 +78,7 @@ ambientes Conda correspondientes (esto facilita ubicar el origen de cualquier er
 | 14 | Anotación genómica (Prokka) | ✅ Hecho |
 | 15 | Detección de AMR (AMRFinderPlus) | ✅ Hecho |
 | 16 | Comparación con estándar de referencia | ✅ Hecho |
-| 17 | Integración de resultados (tabla maestra) | ⏳ Pendiente |
+| 17 | Integración de resultados (tabla maestra) | ✅ Hecho |
 | 18 | Medición de desempeño computacional | ⏳ Pendiente |
 | 19 | Pruebas de reproducibilidad | ⏳ Pendiente |
 | 20 | Estadística en R | ⏳ Pendiente |
@@ -513,7 +513,56 @@ de gen confirmada (TN), y referencia indeterminada con detección real
 (`Indeterminado`, con el gen detectado igual visible en la tabla en vez de
 perderse).
 
+### 17. Integración de resultados (tabla maestra)
+
+**`workflow/scripts/merge_results.py`** arma `results/tables/master_results.tsv`:
+**una fila por muestra**, uniendo (left join sobre `sample_id`, partiendo
+siempre de `samples.tsv` como base para que ninguna muestra documentada
+desaparezca) los resúmenes de todos los módulos: metadatos/fenotipo, calidad
+y cobertura (fastp), métricas de ensamblaje (QUAST), completitud/contaminación
+(CheckM), taxonomía (Kraken2), un resumen corto de genes de AMR detectados, y
+la comparación con el estándar de referencia.
+
+Siguiendo la advertencia de la sección 15 de evitar "combinar múltiples genes
+en columnas difíciles de analizar", la tabla maestra **no** lista el detalle
+de cada gen en columnas — solo agrega un resumen corto por muestra
+(`detected_gene_count`, `detected_beta_lactam_gene_count`, `detected_genes`
+como texto separado por comas). El detalle completo (identidad, cobertura,
+coordenadas) sigue viviendo exclusivamente en la tabla larga
+(`amr_summary.tsv` / `amr_classified.tsv`).
+
+**`final_status`** (nueva columna, resuelve la nota pendiente que dejé en la
+parte 16): combina los cuatro estados de control de calidad
+(`coverage_status`, `assembly_status`, `completeness_status`,
+`taxonomy_status`) en un solo veredicto — `EXCLUDED` si algún módulo dio
+`FAIL` (candidata a excluirse del análisis principal, pero **sigue apareciendo
+en la tabla**, nunca desaparece en silencio), `WARNING` si nada falló pero
+algo advirtió, `PASS` si todo pasó, o `PENDING` si a esa muestra todavía no
+le corrió ningún módulo de QC.
+
+Columnas con el mismo nombre en dos módulos (`gc_content_percent` lo reporta
+tanto fastp —de las lecturas— como QUAST —del ensamblaje—) se renombran antes
+de unir (`reads_gc_content_percent` / `assembly_gc_content_percent`) para que
+no se pisen entre sí.
+
+**Columnas pendientes:** "Tiempo" y "Memoria" (medición de desempeño
+computacional) aún no existen como módulo — se agregan en la parte 18,
+siguiendo el orden recomendado del propio documento (primero la tabla
+maestra, después tiempo/RAM). `merge_results.py` se extenderá entonces.
+
+**Resiliencia:** si la tabla de resumen de algún módulo todavía no existe
+(corrida parcial durante el desarrollo), se avisa por stdout y se continúa
+sin ese módulo, en vez de fallar — probado quitando la tabla de CheckM: el
+script avisa, sigue, y `final_status` se recalcula usando solo los módulos
+efectivamente disponibles (una muestra que antes era `EXCLUDED` por
+CheckM vuelve a `PASS` si ya no hay evidencia de ese fallo disponible).
+
+Probado de extremo a extremo con tres muestras sintéticas consistentes entre
+todos los módulos: una que pasa todo (`PASS`), una que falla completitud vía
+CheckM (`EXCLUDED`), y una con cobertura límite (`WARNING`) — el resumen de
+AMR y la comparación de referencia coinciden correctamente en cada fila.
+
 ## Próximos pasos
 
-Continuar con la **parte 17**: integración de resultados / tabla maestra
-(sección 15 del diseño del pipeline).
+Continuar con la **parte 18**: medición de desempeño computacional (tiempo y
+memoria), sección 16 del diseño del pipeline.
