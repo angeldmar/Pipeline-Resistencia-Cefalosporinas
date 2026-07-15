@@ -24,6 +24,7 @@ threads:
   fastp: 4
   spades: 8
   quast: 4
+  checkm: 4
   kraken2: 4
   amrfinder: 4
 

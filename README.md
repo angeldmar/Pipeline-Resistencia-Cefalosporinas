@@ -73,7 +73,7 @@ ambientes Conda correspondientes (esto facilita ubicar el origen de cualquier er
 | 9 | Verificación de cobertura | ✅ Hecho |
 | 10 | Ensamblaje genómico (SPAdes) | ✅ Hecho |
 | 11 | Evaluación del ensamblaje (QUAST) | ✅ Hecho |
-| 12 | Completitud y contaminación | ⏳ Pendiente |
+| 12 | Completitud y contaminación (CheckM) | ✅ Hecho |
 | 13 | Identificación taxonómica (Kraken2) | ⏳ Pendiente |
 | 14 | Anotación genómica | ⏳ Pendiente |
 | 15 | Detección de AMR (AMRFinderPlus) | ⏳ Pendiente |
@@ -296,7 +296,43 @@ con N50 bajo pero todo lo demás normal (WARNING), y uno con exceso de
 contigs a pesar de tener un N50 razonable, confirmando que el criterio FAIL
 tiene prioridad sobre WARNING.
 
+### 12. Completitud y contaminación (CheckM)
+
+El documento dejaba la herramienta sin especificar ("una herramienta
+específica"); se acordó con el usuario usar **CheckM**, el estándar de facto
+para completitud/contaminación de genomas bacterianos vía genes marcadores de
+copia única específicos del linaje. Se agregaron dos reglas más a
+`workflow/rules/assembly.smk` (evalúa el mismo ensamblaje filtrado que QUAST):
+
+- `checkm`: CheckM espera una **carpeta** de bins (genomas), no un archivo
+  suelto, así que la regla copia primero el ensamblaje filtrado de la muestra
+  a su propia carpeta de bins y luego corre `checkm lineage_wf --tab_table`.
+- `parse_checkm`: llama a `parse_checkm.py parse` sobre la tabla resultante.
+
+**`workflow/scripts/parse_checkm.py`** (script nuevo, no listado en la
+estructura fija) sigue el mismo patrón de archivo-por-muestra +
+`combine`, con una diferencia importante: el subcomando `combine` no solo
+escribe `checkm_summary.tsv`, sino que además genera
+**`results/tables/checkm_exclusions.tsv`**, un registro aparte con únicamente
+las muestras `FAIL` y el motivo — tal como pide la sección 10 ("las muestras
+que fallen pueden excluirse del análisis principal, pero deben permanecer en
+el registro de exclusiones"). Ninguna muestra desaparece del resumen general.
+
+Clasificación: `PASS` solo si completitud ≥ `assembly.minimum_completeness`
+(95%) **y** contaminación < `assembly.maximum_contamination` (5%); cualquier
+otro caso es `FAIL` (el documento no pide un nivel `WARNING` intermedio aquí).
+
+Añadido también `workflow/envs/checkm.yaml` (placeholder, se completará en la
+parte de ambientes Conda) y `threads.checkm` en `config.yaml`, ya que CheckM
+tampoco estaba en la lista original de ambientes.
+
+Probado con tres reportes CheckM sintéticos (formato `--tab_table` real):
+un caso PASS, un caso que falla solo por completitud baja, y un caso que
+falla solo por contaminación alta — ambos modos de fallo se detectan por
+separado correctamente, y el registro de exclusiones lista ambos con su
+motivo sin que desaparezcan del resumen combinado.
+
 ## Próximos pasos
 
-Continuar con la **parte 12**: completitud y contaminación del ensamblaje
-(sección 10 del diseño del pipeline).
+Continuar con la **parte 13**: identificación taxonómica con Kraken2 (sección
+11 del diseño del pipeline).

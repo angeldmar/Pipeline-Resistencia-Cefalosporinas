@@ -1,8 +1,10 @@
 # ============================================================================
 # assembly.smk
-# Ensamblaje genomico de novo con SPAdes, filtrado de contigs cortos, y
+# Ensamblaje genomico de novo con SPAdes, filtrado de contigs cortos,
 # evaluacion del ensamblaje con QUAST (numero de contigs, N50, longitud
-# total, contenido GC) con clasificacion automatica PASS/WARNING/FAIL.
+# total, contenido GC), y estimacion de completitud/contaminacion con CheckM.
+# Todas estas reglas evaluan la calidad del mismo ensamblaje filtrado, por
+# eso se mantienen juntas en este archivo.
 # ============================================================================
 
 rule spades:
@@ -103,5 +105,62 @@ rule parse_quast:
           --minimum-total-length {config[assembly][minimum_total_length]} \
           --maximum-total-length {config[assembly][maximum_total_length]} \
           --n50-warning-threshold {config[assembly][n50_warning_threshold]} \
+          > {log} 2>&1
+        """
+
+
+rule checkm:
+    # Estima completitud y contaminacion con CheckM, a partir de genes
+    # marcadores de copia unica especificos del linaje taxonomico. CheckM
+    # espera una CARPETA de bins (genomas), no un solo archivo, asi que la
+    # regla primero copia el ensamblaje filtrado de esta muestra a su propia
+    # carpeta de bins antes de correr "checkm lineage_wf".
+    input:
+        "results/assemblies/{sample}/contigs.filtered.fasta",
+    output:
+        report="results/qc/checkm/{sample}/checkm_summary.tsv",
+    params:
+        bin_dir="results/qc/checkm/{sample}/bins",
+        outdir="results/qc/checkm/{sample}/output",
+        database=config["paths"]["checkm_database"],
+    log:
+        "logs/checkm/{sample}.log",
+    conda:
+        "../envs/checkm.yaml"
+    threads:
+        config["threads"]["checkm"]
+    shell:
+        """
+        mkdir -p {params.bin_dir}
+        cp {input} {params.bin_dir}/{wildcards.sample}.fasta
+        checkm data setRoot {params.database} > {log} 2>&1
+        checkm lineage_wf \
+          -x fasta \
+          --tab_table \
+          -f {output.report} \
+          -t {threads} \
+          {params.bin_dir} {params.outdir} \
+          >> {log} 2>&1
+        """
+
+
+rule parse_checkm:
+    # Extrae completitud y contaminacion del reporte de CheckM y clasifica la
+    # muestra en PASS/FAIL segun los umbrales de config.yaml. Sigue el mismo
+    # patron de archivo-por-muestra que parse_fastp y parse_quast.
+    input:
+        "results/qc/checkm/{sample}/checkm_summary.tsv",
+    output:
+        "results/tables/checkm/{sample}.tsv",
+    log:
+        "logs/parse_checkm/{sample}.log",
+    conda:
+        "../envs/python.yaml"
+    shell:
+        """
+        python workflow/scripts/parse_checkm.py parse {wildcards.sample} {input} \
+          --output-dir results/tables/checkm \
+          --minimum-completeness {config[assembly][minimum_completeness]} \
+          --maximum-contamination {config[assembly][maximum_contamination]} \
           > {log} 2>&1
         """
