@@ -76,7 +76,7 @@ ambientes Conda correspondientes (esto facilita ubicar el origen de cualquier er
 | 12 | Completitud y contaminación (CheckM) | ✅ Hecho |
 | 13 | Identificación taxonómica (Kraken2) | ✅ Hecho |
 | 14 | Anotación genómica (Prokka) | ✅ Hecho |
-| 15 | Detección de AMR (AMRFinderPlus) | ⏳ Pendiente |
+| 15 | Detección de AMR (AMRFinderPlus) | ✅ Hecho |
 | 16 | Comparación con estándar de referencia | ⏳ Pendiente |
 | 17 | Integración de resultados (tabla maestra) | ⏳ Pendiente |
 | 18 | Medición de desempeño computacional | ⏳ Pendiente |
@@ -409,7 +409,55 @@ extrae correctamente CDS/rRNA/tRNA del resumen, cuenta bien 2 genes
 hipotéticos de 5 filas de ejemplo, y maneja sin fallar el caso de Prokka no
 instalado (versión `"unknown"`).
 
+### 15. Detección de AMR (AMRFinderPlus)
+
+**`workflow/rules/amr_detection.smk`** define tres reglas:
+
+- `amrfinder`: corre AMRFinderPlus directamente sobre el ensamblaje de
+  nucleótidos filtrado (no depende de la anotación de Prokka).
+- `parse_amrfinder`: normaliza la salida cruda por muestra.
+- `classify_cephalosporin_genes`: **paso de agregación final** (no por
+  muestra, a diferencia de los demás parsers) — toma el listado ya combinado
+  de todas las muestras y le agrega la clasificación mecanicista.
+
+**`workflow/scripts/parse_amrfinder.py`** convierte la tabla cruda de
+AMRFinderPlus a un esquema propio y estable (tabla **larga**: una fila por
+gen detectado, siguiendo la recomendación de la sección 15 de evitar
+combinar múltiples genes en columnas difíciles de analizar): símbolo del
+gen, familia (derivada quitando el sufijo de alelo, ej. `blaCTX-M-15` →
+`blaCTX-M`), alelo, nombre descriptivo, clase/subclase de antimicrobiano,
+método de detección, % identidad, % cobertura, contig y coordenadas. Las
+detecciones por debajo de los umbrales `amr.minimum_identity` /
+`amr.minimum_gene_coverage` **no se descartan**: quedan marcadas con
+`meets_identity_coverage_threshold=False`, visible en la tabla. Si una
+muestra no tiene genes detectados, se escribe igual un archivo (con
+encabezado, 0 filas) para distinguir "sin genes" de "no procesada".
+
+**`workflow/scripts/classify_cephalosporin_genes.py`**: implementa
+`classify_beta_lactamase()`, pero **generaliza** el ejemplo del documento en
+un punto importante — en vez de fijar las familias BLEE/AmpC en el código
+(duplicando lo que ya vive en `resistance_targets.yaml`), las **lee** de ese
+archivo. Esto además corrigió dos huecos del ejemplo original: (1) GES tiene
+el mismo problema que SHV/TEM (hay alelos GES que son carbapenemasas, no
+BLEE), así que cualquier familia marcada `-ESBL` en el YAML pasa por la
+misma verificación de subclase, no solo SHV y TEM explícitamente; (2) se
+agregó la categoría `Carbapenemase` (el ejemplo original no la contemplaba
+pese a que `resistance_targets.yaml` ya definía esa lista).
+
+Probado con AMRFinderPlus sintético cubriendo los casos clave:
+
+- `blaCTX-M-15` (subclase `CEPHALOSPORIN`) → **ESBL** — familia sin ambigüedad.
+- `blaTEM-1` y `blaSHV-1` (subclase `BETA-LACTAM`, no `EXTENDED-SPECTRUM`) →
+  **Other**, no ESBL — confirma la regla central de la sección 13.3: el
+  prefijo de familia por sí solo no basta.
+- `blaCMY-2` (subclase `CEPHALOSPORIN`) → **AmpC**.
+- `blaNDM-1` (subclase `CARBAPENEM`) → **Carbapenemase**.
+- Un gen de aminoglucósido → `N/A` (la clasificación BLEE no le aplica).
+- Una detección con 60% de cobertura (< umbral 80%) → queda en la tabla con
+  `meets_identity_coverage_threshold=False`, no se pierde.
+- Una muestra sin genes detectados → tabla vacía sin error.
+
 ## Próximos pasos
 
-Continuar con la **parte 15**: detección de resistencia antimicrobiana con
-AMRFinderPlus (sección 13 del diseño del pipeline).
+Continuar con la **parte 16**: comparación con el estándar de referencia
+(sección 14 del diseño del pipeline).
