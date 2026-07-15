@@ -80,7 +80,7 @@ ambientes Conda correspondientes (esto facilita ubicar el origen de cualquier er
 | 16 | Comparación con estándar de referencia | ✅ Hecho |
 | 17 | Integración de resultados (tabla maestra) | ✅ Hecho |
 | 18 | Medición de desempeño computacional | ✅ Hecho |
-| 19 | Pruebas de reproducibilidad | ⏳ Pendiente |
+| 19 | Pruebas de reproducibilidad | ✅ Hecho |
 | 20 | Estadística en R | ⏳ Pendiente |
 | 21 | Generación de reportes HTML | ⏳ Pendiente |
 | 22 | Snakefile principal y reglas de Snakemake | ⏳ Pendiente |
@@ -628,7 +628,43 @@ identifica correctamente como el módulo más costoso. La tabla maestra
 extendida se probó de punta a punta con el mismo fixture de tres muestras de
 la parte 17, confirmando que las nuevas columnas no alteran `final_status`.
 
+### 19. Pruebas de reproducibilidad
+
+**`workflow/scripts/assess_reproducibility.py`** (script nuevo) compara
+corridas repetidas de la misma muestra (convención `{base}_run{n}`, ej.
+`EC001_run1`, `EC001_run2`, `EC001_run3`) por pares, usando exactamente las
+funciones `exact_gene_concordance()` y `jaccard_similarity()` del documento,
+más dos comparaciones categóricas adicionales:
+
+- **Genes y alelos**: concordancia exacta + Jaccard sobre el conjunto de
+  genes confiables detectados (el símbolo de gen de AMRFinderPlus ya
+  codifica el alelo, así que esto cubre ambos requisitos del documento a la vez).
+- **Archivo de ensamblaje final**: hash SHA-256 de `contigs.filtered.fasta`
+  — idéntico o no entre corridas (SPAdes no es perfectamente determinista
+  entre corridas por sus heurísticas multi-hilo, así que esta comparación
+  es real, no una formalidad).
+- **Estado de clasificación**: coincidencia del `final_status` de la tabla
+  maestra entre corridas.
+
+**Límite de arquitectura respetado a propósito:** el documento reserva el
+coeficiente de variación **exclusivamente para R** ("R se reservará
+únicamente para... Coeficiente de variación"). Por eso este script **no
+calcula CV**, ni siquiera como medida secundaria de apoyo — solo usa
+comparaciones categóricas/exactas. Los datos numéricos crudos por corrida
+(cobertura, tiempo, RAM) ya quedan disponibles en `master_results.tsv` con
+un `sample_id` por corrida; R los tomará de ahí (vía la columna `run` de
+`validation_input.csv`) para calcular el CV formalmente en la parte 20.
+
+Probado: funciones puras (`exact_gene_concordance`, `jaccard_similarity`,
+`parse_replicate_run_id`, `group_replicate_runs`) contra casos conocidos, y
+un caso de extremo a extremo con tres corridas sintéticas de `EC001` (dos
+idénticas en genes/hash/estado, una tercera con un gen no detectado, hash de
+ensamblaje distinto y estado `WARNING` en vez de `PASS`) — las 3
+comparaciones por pares resultan correctas: 1 par totalmente concordante,
+2 pares discordantes en las tres dimensiones a la vez.
+
 ## Próximos pasos
 
-Continuar con la **parte 19**: pruebas de reproducibilidad (sección 17 del
-diseño del pipeline).
+Continuar con la **parte 20**: estadística en R (sección 18 del diseño del
+pipeline) — sensibilidad, especificidad, kappa, intervalos de confianza y
+coeficiente de variación.
