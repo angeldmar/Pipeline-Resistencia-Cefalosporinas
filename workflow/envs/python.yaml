@@ -12,3 +12,4 @@ dependencies:
   - biopython
   - jinja2
   - matplotlib
+  - pytest

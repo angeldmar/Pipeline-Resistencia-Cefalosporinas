@@ -85,7 +85,7 @@ ambientes Conda correspondientes (esto facilita ubicar el origen de cualquier er
 | 21 | Generación de reportes HTML | ✅ Hecho |
 | 22 | Snakefile principal y reglas de Snakemake | ✅ Hecho |
 | 23 | Ambientes Conda | ✅ Hecho |
-| 24 | Pruebas (unitarias, integración, e2e, negativas) | ⏳ Pendiente |
+| 24 | Pruebas (unitarias, integración, extremo a extremo, negativas) | ✅ Hecho |
 
 ## Detalle de lo implementado
 
@@ -908,7 +908,77 @@ compilaciones completas para las tres herramientas sin necesidad de emulación.
 usuario: los ambientes bioconda más pesados pueden tardar varios minutos
 cada uno en resolver, sin necesidad real de verificarlo en este momento).
 
-## Próximos pasos
+### 24. Pruebas (unitarias, integración, extremo a extremo, negativas)
 
-Continuar con la **parte 24**: pruebas (unitarias, integración, extremo a
-extremo, negativas) — sección 22 del diseño del pipeline.
+Instalé `pytest` (agregado también a `workflow/envs/python.yaml`) y construí
+la suite completa en `tests/`, con un `tests/conftest.py` que agrega
+`workflow/scripts/` a `sys.path` (los scripts no son un paquete instalado,
+son ejecutables independientes) y expone un fixture `repo_root` para que
+ningún test dependa del directorio desde el que se invoque `pytest`. Se
+agregó `pytest.ini` (`testpaths = tests`) para que `pytest` sin argumentos,
+corrido desde la raíz, descubra todo automáticamente.
+
+**106 pruebas, en los 4 niveles que pide la sección 22**, todas reutilizando
+los mismos casos que ya se habían validado manualmente a lo largo de las 23
+partes anteriores, ahora formalizados con `assert`:
+
+- **Unitarias** (`tests/unit/`, ~96 pruebas): una por script con lógica de
+  clasificación — `validate_samples`, `parse_fastp` (incluida la fórmula
+  exacta de cobertura del documento), `parse_quast` (incluida la prioridad
+  de FAIL sobre WARNING), `parse_checkm`, `parse_kraken2` (incluido el caso
+  Shigella), `filter_contigs`, `classify_cephalosporin_genes` (el caso
+  crítico TEM/SHV no-BLEE), `compare_to_reference` (incluida la regresión
+  del bug de la parte 16), `assess_reproducibility`, `merge_results`.
+- **Integración** (`tests/integration/`): verifica el contrato *real* entre
+  scripts consecutivos — `parse_amrfinder` → `classify_cephalosporin_genes`
+  → `compare_to_reference` encadenados con datos que imitan el formato real
+  de AMRFinderPlus, y el ensamblaje completo de la tabla maestra a partir de
+  las salidas sintéticas de los 7 módulos.
+- **Extremo a extremo** (`tests/e2e/`): una muestra sintética completa
+  recorre la cadena entera de scripts en Python — JSON de fastp → report.tsv
+  de QUAST → tabla de CheckM → reporte de Kraken2 → tabla de AMRFinderPlus →
+  clasificación → comparación de referencia → tabla maestra → reporte HTML
+  final — verificando que el HTML resultante contenga el hallazgo genotípico
+  correcto y **no** contenga ninguna frase de conclusión clínica prohibida.
+- **Negativas** (`tests/negative/`): casos que solo se manifiestan al cruzar
+  módulos — una muestra de "especie distinta" o "contaminada" queda
+  `EXCLUDED` en la tabla maestra sin desaparecer, pedir el reporte de una
+  muestra inexistente falla con un mensaje claro (no un error críptico de
+  pandas), y variantes de metadatos incompletos (`samples.tsv` con 0 filas,
+  con múltiples columnas faltantes a la vez).
+
+**Alcance declarado explícitamente en los docstrings de las pruebas de
+integración y e2e:** ninguna herramienta bioinformática externa (fastp,
+SPAdes, QUAST, CheckM, Kraken2, Prokka, AMRFinderPlus) está instalada en
+este entorno de desarrollo (y tres de ellas ni siquiera tienen build para
+`osx-arm64`, ver parte 23), así que estas pruebas ejercitan la cadena
+completa de **código Python propio** con datos que imitan el formato real
+de salida de esas herramientas, no las herramientas en sí. Esto es
+consistente con cómo se validó cada módulo a lo largo de todo el desarrollo.
+
+**Un hallazgo real durante la escritura de las pruebas** (no un bug del
+pipeline, sino de mi primer intento de prueba): al construir
+`test_low_confidence_detection_excluded...` con una tabla de 2 genes
+modificando la cobertura de uno solo, el otro gen (con identidad/cobertura
+altas, sin modificar) seguía contando como detección confiable e inflaba el
+resultado esperado. Corregido usando una tabla de un solo gen para aislar
+exactamente lo que la prueba quería verificar — un recordatorio de que los
+fixtures de prueba también pueden tener bugs, no solo el código bajo prueba.
+
+Ejecutar toda la suite: `pytest` (desde la raíz del repositorio).
+
+## Estado del roadmap
+
+Las 24 partes del diseño del pipeline están completas. Lo que queda para
+llevar esto de "estructura y lógica verificada" a "pipeline ejecutado sobre
+datos reales" (pasos 18–22 de la sección 23 del documento original) no es
+más código, sino **ejecución real**: instalar los ambientes Conda de verdad
+(con el ajuste `CONDA_SUBDIR=osx-64` documentado en la parte 23 si se corre
+en esta Mac, o directamente en Linux), descargar un conjunto real de genomas
+de *E. coli* desde un repositorio público, correr `snakemake --use-conda`
+sobre ellos, revisar los resultados, y solo entonces considerar fijar
+versiones de herramientas y publicar. Ningún paso de esos requiere volver a
+tocar el código del pipeline salvo que la ejecución real revele un problema
+no capturado por las pruebas — que es exactamente el tipo de cosa que estas
+pruebas no pueden garantizar al 100%, dado que ninguna corrió contra la
+herramienta bioinformática real subyacente.
