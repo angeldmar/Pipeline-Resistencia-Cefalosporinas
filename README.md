@@ -220,9 +220,9 @@ filtrado) — no hace falta ejecutar ninguna herramienta adicional.
 - `classify_coverage(estimated_coverage, minimum_coverage, warning_coverage)`:
   clasifica la cobertura en `PASS` (≥30x), `WARNING` (15x–30x) o `FAIL` (<15x).
   Los umbrales 30x/15x están en `config.yaml`
-  (`quality.minimum_coverage` / `quality.warning_coverage`); el documento solo
-  especificaba el umbral PASS, así que el umbral WARNING (15x) se acordó
-  explícitamente con el usuario antes de implementarlo.
+  (`quality.minimum_coverage` / `quality.warning_coverage`); la especificación
+  del pipeline solo definía el umbral PASS, así que el umbral WARNING (15x) se
+  fijó explícitamente antes de implementarlo.
 - Ninguna muestra se descarta en silencio: `mean_read_length`,
   `estimated_coverage` y `coverage_status` quedan como columnas nuevas en la
   misma tabla por muestra (`results/tables/fastp/{sample_id}.tsv`), visibles
@@ -298,9 +298,9 @@ tiene prioridad sobre WARNING.
 
 ### 12. Completitud y contaminación (CheckM)
 
-El documento dejaba la herramienta sin especificar ("una herramienta
-específica"); se acordó con el usuario usar **CheckM**, el estándar de facto
-para completitud/contaminación de genomas bacterianos vía genes marcadores de
+La especificación del pipeline dejaba la herramienta sin definir ("una
+herramienta específica"); se utiliza **CheckM**, el estándar de facto para
+completitud/contaminación de genomas bacterianos vía genes marcadores de
 copia única específicos del linaje. Se agregaron dos reglas más a
 `workflow/rules/assembly.smk` (evalúa el mismo ensamblaje filtrado que QUAST):
 
@@ -373,7 +373,7 @@ Probado con tres reportes Kraken2 sintéticos (formato real, jerárquico):
 
 ### 14. Anotación genómica (Prokka)
 
-Herramienta no especificada por el documento; se acordó con el usuario usar
+Herramienta no especificada en la especificación del pipeline; se utiliza
 **Prokka** (estándar clásico, ampliamente citado, sin necesidad de descargar
 una base de datos de referencia grande, a diferencia de Bakta). Se creó
 **`workflow/rules/annotation.smk`** (archivo nuevo, no estaba en la lista fija
@@ -485,7 +485,8 @@ detectados con confianza (`meets_identity_coverage_threshold=True`) en
 control de calidad anterior (cobertura, ensamblaje, taxonomía,
 completitud) — esa integración le corresponde a la tabla maestra
 (`merge_results.py`, parte 17), que es la que tiene visibilidad de todos los
-módulos a la vez. Lo dejo anotado explícitamente para no perderlo de vista.
+módulos a la vez. Esta limitación de alcance queda documentada explícitamente
+aquí, para la integración posterior.
 
 **Bug encontrado y corregido durante las pruebas:** la primera versión trataba
 `reference_positive` con `if reference_positive:`, y como `None` (el caso
@@ -531,8 +532,8 @@ como texto separado por comas). El detalle completo (identidad, cobertura,
 coordenadas) sigue viviendo exclusivamente en la tabla larga
 (`amr_summary.tsv` / `amr_classified.tsv`).
 
-**`final_status`** (nueva columna, resuelve la nota pendiente que dejé en la
-parte 16): combina los cuatro estados de control de calidad
+**`final_status`** (nueva columna, resuelve la limitación de alcance señalada
+en la parte 16): combina los cuatro estados de control de calidad
 (`coverage_status`, `assembly_status`, `completeness_status`,
 `taxonomy_status`) en un solo veredicto — `EXCLUDED` si algún módulo dio
 `FAIL` (candidata a excluirse del análisis principal, pero **sigue apareciendo
@@ -678,9 +679,9 @@ compararlas. A partir de aquí, **Python no calcula ninguna estadística** —
 solo prepara y limpia los datos.
 
 **`workflow/scripts/run_statistics.R`** es el único script del pipeline que
-hace estadística formal. Instalé los paquetes `readr`, `caret`, `irr` y
-`ggplot2` en el R del sistema para poder probarlo de verdad (`caret` necesitó
-además `stringi`, que no se resolvió solo). Calcula:
+hace estadística formal. Requiere los paquetes de R `readr`, `caret`, `irr` y
+`ggplot2` (`caret` depende además de `stringi`, una dependencia transitiva
+que no se resuelve automáticamente en todas las instalaciones). Calcula:
 
 - **Matriz de confusión** (`caret::confusionMatrix`) → `confusion_matrix.txt`
   (texto completo) y `contingency_table.csv` (la tabla 2×2 sola, para
@@ -773,9 +774,10 @@ Probado de extremo a extremo con `EC001` (3 genes: `blaCTX-M-15` confiable,
 
 ### 22. Snakefile principal
 
-Instalé Snakemake (`pip install snakemake`, versión 9.23.1) para poder
-validar de verdad el grafo completo — algo que no había sido posible hasta
-ahora, ya que este archivo era el que finalmente conectaba todas las piezas.
+La validación completa del grafo de dependencias requiere Snakemake
+(`pip install snakemake`, versión 9.23.1) — no había sido posible antes,
+dado que este archivo es el que finalmente conecta todas las piezas
+construidas en las partes anteriores.
 
 **Reglas de agregación finalmente conectadas.** Las reglas `combine_fastp`,
 `combine_quast`, `combine_checkm` (+ `checkm_exclusions.tsv`),
@@ -875,11 +877,12 @@ principio de "un ambiente por herramienta" también para la descarga) y
 `r_statistics.yaml` (incluye `r-stringi` explícitamente, la dependencia
 transitiva de `caret` que faltó instalar sola en la parte 20).
 
-**Hallazgo importante de compatibilidad de plataforma:** al verificar los
-nombres de paquete contra los índices reales de bioconda (sin instalar, solo
-consultando su API), encontré que **QUAST, CheckM (`checkm-genome`) y Prokka
-no tienen compilaciones para `osx-arm64`** (Apple Silicon — la arquitectura
-de esta Mac y, cada vez más, la más común entre desarrolladores). Sí existen
+**Hallazgo importante de compatibilidad de plataforma:** la verificación de
+los nombres de paquete contra los índices reales de bioconda (sin instalar,
+solo consultando su API) reveló que **QUAST, CheckM (`checkm-genome`) y
+Prokka no tienen compilaciones para `osx-arm64`** (Apple Silicon — la
+arquitectura de esta Mac y, cada vez más, la más común entre desarrolladores).
+Sí existen
 para `osx-64` (Intel) y `linux-64`. Esto significa que `snakemake --use-conda`
 fallaría al intentar crear esos tres ambientes en esta máquina tal cual.
 
@@ -904,14 +907,14 @@ compilaciones completas para las tres herramientas sin necesidad de emulación.
 `yaml.safe_load`), y los 8 nombres de paquete bioconda (`fastp`, `spades`,
 `quast`, `checkm-genome`, `kraken2`, `prokka`, `ncbi-amrfinderplus`,
 `sra-tools`) confirmados como existentes consultando la API de anaconda.org
-— no se ejecutó `conda env create` de verdad (decisión tomada con el
-usuario: los ambientes bioconda más pesados pueden tardar varios minutos
-cada uno en resolver, sin necesidad real de verificarlo en este momento).
+— no se ejecutó `conda env create` de verdad: los ambientes bioconda más
+pesados pueden tardar varios minutos cada uno en resolver, sin necesidad
+real de verificarlo en esta etapa del desarrollo.
 
 ### 24. Pruebas (unitarias, integración, extremo a extremo, negativas)
 
-Instalé `pytest` (agregado también a `workflow/envs/python.yaml`) y construí
-la suite completa en `tests/`, con un `tests/conftest.py` que agrega
+La suite completa se construyó en `tests/`, con `pytest` como dependencia
+(agregada también a `workflow/envs/python.yaml`). `tests/conftest.py` agrega
 `workflow/scripts/` a `sys.path` (los scripts no son un paquete instalado,
 son ejecutables independientes) y expone un fixture `repo_root` para que
 ningún test dependa del directorio desde el que se invoque `pytest`. Se
@@ -956,8 +959,8 @@ completa de **código Python propio** con datos que imitan el formato real
 de salida de esas herramientas, no las herramientas en sí. Esto es
 consistente con cómo se validó cada módulo a lo largo de todo el desarrollo.
 
-**Un hallazgo real durante la escritura de las pruebas** (no un bug del
-pipeline, sino de mi primer intento de prueba): al construir
+**Un hallazgo durante la escritura de las pruebas** (no un bug del pipeline,
+sino del primer intento de esta prueba en particular): al construir
 `test_low_confidence_detection_excluded...` con una tabla de 2 genes
 modificando la cobertura de uno solo, el otro gen (con identidad/cobertura
 altas, sin modificar) seguía contando como detección confiable e inflaba el
@@ -982,3 +985,8 @@ tocar el código del pipeline salvo que la ejecución real revele un problema
 no capturado por las pruebas — que es exactamente el tipo de cosa que estas
 pruebas no pueden garantizar al 100%, dado que ninguna corrió contra la
 herramienta bioinformática real subyacente.
+
+## Licencia
+
+Este proyecto se distribuye bajo la licencia MIT. El texto completo está en
+el archivo [`LICENSE`](LICENSE), en la raíz del repositorio.
