@@ -980,7 +980,7 @@ documento original de 23 secciones:
 |---|-------|--------|
 | 25 | Segundo motor de AMR (ABricate) y concordancia analítica entre motores | ✅ Hecho |
 | 26 | Tipificación de secuencia multilocus (MLST) | ✅ Hecho |
-| 27 | Descarga de CSV desde el reporte HTML | ⏳ Pendiente |
+| 27 | Descarga de CSV desde el reporte HTML | ✅ Hecho |
 | 28 | Interfaz web local para análisis ad-hoc (subir FASTQ/FASTA) | ⏳ Pendiente |
 
 ### 25. Segundo motor de AMR (ABricate) y concordancia entre motores
@@ -1107,6 +1107,36 @@ clasificados correctamente, y el caso negativo de una tabla de entrada vacía
 manejado sin fallar (no debería ocurrir en condiciones normales, pero no se
 asume que nunca pasará). El grafo completo de Snakemake resuelve con las 3
 ejecuciones de `mlst` esperadas.
+
+### 27. Descarga de CSV desde el reporte HTML
+
+Cada reporte individual (`generate_report.py`) ahora incluye dos enlaces de
+descarga, junto al estado final de la muestra: **"Descargar resumen (CSV)"**
+(la fila completa de la muestra en la tabla maestra: metadatos, calidad,
+cobertura, ensamblaje, taxonomía, MLST, concordancia entre motores,
+desempeño — todo lo que ya está en `master_results.tsv`) y **"Descargar
+genes detectados (CSV)"** (la tabla de genes de AMR con su clasificación
+mecanística, la misma que ya se muestra en el reporte).
+
+**Decisión de arquitectura, consistente con la ya tomada para el gráfico
+embebido (parte 21):** el CSV se codifica en base64 y se embebe directamente
+como *data URI* (`data:text/csv;charset=utf-8;base64,...`) en el atributo
+`href` del enlace, en vez de escribirse como un archivo `.csv` suelto junto
+al HTML. El reporte sigue siendo **un único archivo autocontenido**,
+portable y compartible sin depender de mantener una estructura de carpetas
+junto a él.
+
+El enlace de "genes detectados" solo aparece si la muestra tiene al menos un
+gen en la tabla (`amr_genes_csv_uri` es `None` cuando la lista está vacía,
+y la plantilla lo omite con `{% if %}`); el de "resumen" siempre aparece,
+porque toda muestra tiene una fila en la tabla maestra.
+
+Probado: el CSV decodificado desde el *data URI* es **byte-a-byte idéntico**
+al que produciría `pandas.DataFrame.to_csv()` directamente sobre los mismos
+datos (confirma que la codificación/decodificación en base64 no corrompe ni
+trunca información), y que el enlace de genes no aparece cuando la muestra
+no tiene ninguno detectado (en vez de generar un enlace de descarga vacío
+o roto).
 
 ## Estado del roadmap
 

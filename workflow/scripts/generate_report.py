@@ -192,6 +192,19 @@ def render_amr_confidence_chart(amr_genes: list[dict]) -> str | None:
     return base64.b64encode(image_buffer.read()).decode("ascii")
 
 
+def build_csv_download_data_uri(rows: list[dict]) -> str | None:
+    """Convierte una lista de filas (diccionarios) en un enlace de descarga
+    CSV embebido como data URI en base64, para que el reporte siga siendo un
+    unico archivo HTML autocontenido (mismo criterio ya usado para el
+    grafico embebido). None si no hay filas que exportar."""
+    if not rows:
+        return None
+    csv_buffer = io.StringIO()
+    pd.DataFrame(rows).to_csv(csv_buffer, index=False)
+    encoded_csv = base64.b64encode(csv_buffer.getvalue().encode("utf-8")).decode("ascii")
+    return f"data:text/csv;charset=utf-8;base64,{encoded_csv}"
+
+
 def render_report(context: dict, template_dir: Path, template_name: str) -> str:
     """Renderiza la plantilla Jinja2 del reporte con el contexto dado."""
     environment = Environment(loader=FileSystemLoader(str(template_dir)))
@@ -227,6 +240,8 @@ def main() -> None:
         "tool_versions": tool_versions,
         "performance_by_module": performance_by_module,
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        "amr_genes_csv_uri": build_csv_download_data_uri(amr_genes),
+        "sample_summary_csv_uri": build_csv_download_data_uri([master_row]),
     }
 
     html_content = render_report(context, args.template_dir, args.template_name)

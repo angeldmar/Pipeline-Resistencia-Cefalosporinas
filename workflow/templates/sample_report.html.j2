@@ -19,12 +19,24 @@
   .interpretation-list li { margin-bottom: 0.5rem; }
   code { background-color: #f0f0f0; padding: 0.1rem 0.3rem; border-radius: 3px; }
   footer { margin-top: 3rem; font-size: 0.8rem; color: #777; border-top: 1px solid #ddd; padding-top: 0.8rem; }
+  .download-link { display: inline-block; margin: 0.3rem 0.6rem 0.3rem 0; padding: 0.4rem 0.8rem;
+    background-color: #2c5f8a; color: white; text-decoration: none; border-radius: 4px; font-size: 0.88rem; }
+  .download-link:hover { background-color: #1e4666; }
 </style>
 </head>
 <body>
 
 <h1>Reporte de análisis: {{ sample_id }}</h1>
 <p><strong>Estado final:</strong> <span class="status-{{ final_status }}">{{ final_status }}</span></p>
+
+<p>
+{% if sample_summary_csv_uri %}
+<a class="download-link" href="{{ sample_summary_csv_uri }}" download="{{ sample_id }}_resumen.csv">Descargar resumen (CSV)</a>
+{% endif %}
+{% if amr_genes_csv_uri %}
+<a class="download-link" href="{{ amr_genes_csv_uri }}" download="{{ sample_id }}_genes_amr.csv">Descargar genes detectados (CSV)</a>
+{% endif %}
+</p>
 
 <div class="disclaimer-box">
   Este informe describe <strong>hallazgos genotípicos</strong> obtenidos mediante un pipeline
