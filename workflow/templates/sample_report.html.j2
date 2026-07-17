@@ -83,6 +83,16 @@
   <tr><th>Estado</th><td class="status-{{ taxonomy_status }}">{{ taxonomy_status }}</td></tr>
 </table>
 
+<h2>Tipificación de secuencia multilocus (MLST)</h2>
+<p>Contexto epidemiológico del aislamiento (linaje/secuencia tipo), independiente de los
+genes de resistencia detectados. Útil para distinguir diseminación clonal de un mismo
+linaje frente a eventos de adquisición independientes del mismo gen de resistencia.</p>
+<table>
+  <tr><th>Esquema</th><td>{{ scheme }}</td></tr>
+  <tr><th>Secuencia tipo (ST)</th><td>{{ sequence_type }}</td></tr>
+  <tr><th>Confiabilidad del ST</th><td>{{ sequence_type_status }}</td></tr>
+</table>
+
 <h2>Genes de resistencia detectados (AMRFinderPlus)</h2>
 {% if amr_genes %}
 <table>

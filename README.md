@@ -979,7 +979,7 @@ documento original de 23 secciones:
 | # | Parte | Estado |
 |---|-------|--------|
 | 25 | Segundo motor de AMR (ABricate) y concordancia analítica entre motores | ✅ Hecho |
-| 26 | Tipificación de secuencia multilocus (MLST) | ⏳ Pendiente |
+| 26 | Tipificación de secuencia multilocus (MLST) | ✅ Hecho |
 | 27 | Descarga de CSV desde el reporte HTML | ⏳ Pendiente |
 | 28 | Interfaz web local para análisis ad-hoc (subir FASTQ/FASTA) | ⏳ Pendiente |
 
@@ -1060,6 +1060,53 @@ observaciones sin variabilidad en un "evaluador", advertencia esperada de
 `irr::kappa2`, no un bug) como el caso de tabla completamente vacía. El
 grafo completo de Snakemake (`snakemake -n`) resuelve con las 6 ejecuciones
 de `abricate` esperadas (2 bases de datos × 3 muestras).
+
+### 26. Tipificación de secuencia multilocus (MLST)
+
+Módulo independiente de la detección de AMR: da contexto epidemiológico
+(linaje/secuencia tipo, ej. ST131) a los genes de resistencia ya detectados
+— dos aislamientos con el mismo gen de resistencia pero distinto ST sugieren
+eventos de adquisición independientes, mientras que el mismo ST en varias
+muestras sugiere diseminación clonal de un linaje.
+
+**`workflow/scripts/parse_mlst.py`** (nuevo) normaliza la salida cruda de
+`mlst` (T. Seemann): una fila por muestra, **sin encabezado**, con FILE,
+SCHEME, ST y luego un número variable de columnas de alelo según el esquema
+taxonómico. El script no asume una cantidad fija de columnas de alelo; las
+junta todas en un solo texto (`allele_profile`).
+
+Un ST puede quedar sin resolver (`sequence_type="-"`, ninguna combinación
+catalogada de alelos coincide) o con una coincidencia aproximada en algún
+alelo individual (marcada con `~` o `?` por `mlst`). Ninguno de los dos
+casos se descarta ni se trata como error: `sequence_type_status` clasifica
+cada resultado como `exact`, `novel_allele` o `unresolved`, y la muestra
+sigue apareciendo en la tabla — mismo principio de "nunca ocultar una
+muestra problemática" ya aplicado a completitud, taxonomía y AMR.
+
+**`workflow/rules/typing.smk`** (archivo nuevo, dedicado a este módulo
+porque no encaja ni en detección de AMR ni en identificación taxonómica de
+especie — es tipificación de cepa, un nivel de granularidad distinto):
+define las reglas `mlst`, `parse_mlst` y `combine_mlst`. Igual que ABricate
+(parte 25), `mlst` escribe su resultado por stdout (no tiene una opción
+`--output`), así que la regla redirige stdout directamente al archivo de
+resultados — beneficiándose del mismo ajuste de `run_with_timing.py` (envía
+su mensaje de estado a stderr) hecho en la parte 25.
+
+`merge_results.py` incorpora `scheme`, `sequence_type` y
+`sequence_type_status` a la tabla maestra y al reporte HTML individual (nueva
+sección "Tipificación de secuencia multilocus"); el perfil de alelos
+completo, más largo, se queda en `mlst_summary.tsv`.
+
+**Nota de plataforma:** `mlst` tampoco tiene compilación para `osx-arm64` en
+bioconda (mismo patrón que QUAST/CheckM/Prokka/ABricate), solo `osx-64` y
+`linux-64`.
+
+Probado: los tres estados de `sequence_type_status` (`exact`, `novel_allele`
+con marcador `~` o `?` en un alelo individual, `unresolved` con ST `-`)
+clasificados correctamente, y el caso negativo de una tabla de entrada vacía
+manejado sin fallar (no debería ocurrir en condiciones normales, pero no se
+asume que nunca pasará). El grafo completo de Snakemake resuelve con las 3
+ejecuciones de `mlst` esperadas.
 
 ## Estado del roadmap
 

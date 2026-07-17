@@ -1,0 +1,15 @@
+# Ambiente para la regla mlst (workflow/rules/typing.smk).
+#
+# Incluye "python" ademas de mlst: run_with_timing.py corre dentro de este
+# mismo ambiente y solo necesita la biblioteca estandar.
+#
+# NOTA de plataforma (igual que QUAST/CheckM/Prokka/ABricate, ver README
+# partes 23 y 25): mlst no tiene compilacion para osx-arm64 en bioconda,
+# solo osx-64 y linux-64. En Apple Silicon requiere CONDA_SUBDIR=osx-64.
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python
+  - mlst

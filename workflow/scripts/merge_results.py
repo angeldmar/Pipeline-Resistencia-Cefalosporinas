@@ -111,6 +111,7 @@ def build_master_table(
     reference_comparison_table: pd.DataFrame | None,
     performance_by_sample_table: pd.DataFrame | None = None,
     engine_concordance_table: pd.DataFrame | None = None,
+    mlst_table: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Arma la tabla maestra: parte de samples.tsv (para que TODA muestra
     documentada aparezca, incluso si a algun modulo todavia le falta
@@ -172,6 +173,13 @@ def build_master_table(
         })
         master_table = master_table.merge(engine_columns, on="sample_id", how="left")
 
+    if mlst_table is not None:
+        # Solo el ST y su confiabilidad; el perfil de alelos completo
+        # (allele_profile) queda en mlst_summary.tsv para no ensanchar la
+        # tabla maestra con un texto largo por muestra.
+        mlst_columns = mlst_table[["sample_id", "scheme", "sequence_type", "sequence_type_status"]]
+        master_table = master_table.merge(mlst_columns, on="sample_id", how="left")
+
     available_qc_gate_columns = [
         column for column in QC_GATE_STATUS_COLUMNS if column in master_table.columns
     ]
@@ -203,6 +211,10 @@ def main() -> None:
         "--engine-concordance", type=Path, default=Path("results/tables/engine_concordance.tsv"),
         help="Concordancia AMRFinderPlus vs. ABricate por muestra (ver compare_amr_engines.py)",
     )
+    parser.add_argument(
+        "--mlst-summary", type=Path, default=Path("results/tables/mlst_summary.tsv"),
+        help="Tipificacion de secuencia multilocus por muestra (ver parse_mlst.py)",
+    )
     parser.add_argument("--output", type=Path, default=Path("results/tables/master_results.tsv"))
     args = parser.parse_args()
 
@@ -218,6 +230,7 @@ def main() -> None:
         load_optional_table(args.reference_comparison, "comparacion con el estandar de referencia"),
         load_optional_table(args.performance_by_sample, "desempeño computacional"),
         load_optional_table(args.engine_concordance, "concordancia entre motores de AMR"),
+        load_optional_table(args.mlst_summary, "tipificacion MLST"),
     )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)

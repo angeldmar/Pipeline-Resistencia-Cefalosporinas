@@ -12,7 +12,7 @@
 # derivan de config.yaml (amr.abricate_databases) en vez de escribirse a mano,
 # para que agregar/quitar una base de datos ahi no desincronice esta lista.
 PERFORMANCE_TRACKED_MODULES = (
-    ["download", "fastp", "spades", "quast", "checkm", "kraken2", "amrfinder"]
+    ["download", "fastp", "spades", "quast", "checkm", "kraken2", "amrfinder", "mlst"]
     + [f"abricate_{database}" for database in config["amr"]["abricate_databases"]]
 )
 
@@ -67,6 +67,7 @@ rule merge_results:
         reference_comparison="results/tables/reference_comparison.tsv",
         performance_by_sample="results/tables/performance_by_sample.tsv",
         engine_concordance="results/tables/engine_concordance.tsv",
+        mlst_summary="results/tables/mlst_summary.tsv",
     output:
         "results/tables/master_results.tsv",
     log:
@@ -85,6 +86,7 @@ rule merge_results:
           --reference-comparison {input.reference_comparison} \
           --performance-by-sample {input.performance_by_sample} \
           --engine-concordance {input.engine_concordance} \
+          --mlst-summary {input.mlst_summary} \
           --output {output} \
           > {log} 2>&1
         """

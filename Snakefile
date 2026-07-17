@@ -42,6 +42,7 @@ include: "workflow/rules/assembly.smk"
 include: "workflow/rules/taxonomy.smk"
 include: "workflow/rules/annotation.smk"
 include: "workflow/rules/amr_detection.smk"
+include: "workflow/rules/typing.smk"
 include: "workflow/rules/statistics.smk"
 include: "workflow/rules/reports.smk"
 
@@ -63,6 +64,7 @@ rule all:
         "results/tables/checkm_exclusions.tsv",
         "results/tables/taxonomy_manual_review.tsv",
         "results/tables/engine_concordance.tsv",
+        "results/tables/mlst_summary.tsv",
         "results/statistics/confusion_matrix.txt",
         "results/statistics/classification_metrics.csv",
         "results/statistics/kappa.csv",
