@@ -1,0 +1,10 @@
+# Dependencias de la interfaz web local de analisis ad-hoc (parte 28).
+#
+# Instalacion aparte de los ambientes Conda del pipeline (workflow/envs/):
+# esta interfaz es una herramienta de desarrollo/conveniencia, no un
+# componente que Snakemake orqueste, asi que no comparte ambiente con
+# python.yaml. Requiere ademas que Snakemake y las herramientas
+# bioinformaticas del pipeline esten instaladas por separado para que el
+# analisis real corra (ver README.md, parte 28).
+flask>=3.0
+pyyaml

@@ -14,8 +14,10 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = REPO_ROOT / "workflow" / "scripts"
+WEBAPP_DIR = REPO_ROOT / "webapp"
 
 sys.path.insert(0, str(SCRIPTS_DIR))
+sys.path.insert(0, str(WEBAPP_DIR))
 
 
 @pytest.fixture

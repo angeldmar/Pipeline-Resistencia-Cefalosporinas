@@ -981,7 +981,7 @@ documento original de 23 secciones:
 | 25 | Segundo motor de AMR (ABricate) y concordancia analítica entre motores | ✅ Hecho |
 | 26 | Tipificación de secuencia multilocus (MLST) | ✅ Hecho |
 | 27 | Descarga de CSV desde el reporte HTML | ✅ Hecho |
-| 28 | Interfaz web local para análisis ad-hoc (subir FASTQ/FASTA) | ⏳ Pendiente |
+| 28 | Interfaz web local para análisis ad-hoc (subir FASTQ/FASTA) | ✅ Hecho |
 
 ### 25. Segundo motor de AMR (ABricate) y concordancia entre motores
 
@@ -1137,6 +1137,76 @@ datos (confirma que la codificación/decodificación en base64 no corrompe ni
 trunca información), y que el enlace de genes no aparece cuando la muestra
 no tiene ninguno detectado (en vez de generar un enlace de descarga vacío
 o roto).
+
+### 28. Interfaz web local para análisis ad-hoc
+
+Herramienta de conveniencia, **distinta del pipeline en sí**: una pequeña
+aplicación Flask (`webapp/`) que corre localmente y permite subir un FASTQ
+pareado o un FASTA ya ensamblado desde el navegador, sin editar
+`config/samples.tsv` ni invocar Snakemake a mano. Requiere las herramientas
+bioinformáticas instaladas (vía los ambientes Conda de `workflow/envs/`) para
+que el análisis real corra; la interfaz no las reemplaza.
+
+**Dos modos de carga, con dos formas de orquestación distintas** (decisión
+justificada por un hallazgo empírico, no solo una preferencia de diseño):
+
+- **FASTQ (lecturas crudas)** → modo **completo**. Se arma una tabla de
+  muestras *aislada* de una sola fila — nunca se toca `config/samples.tsv`,
+  para no mezclar una carga ad-hoc con el lote curado principal — y se
+  lanza Snakemake de verdad (`snakemake --use-conda --config samples=...`)
+  apuntando al reporte completo. Corre el pipeline entero.
+
+- **FASTA (ya ensamblado)** → modo **parcial**. Sin lecturas crudas, fastp,
+  cobertura y Kraken2 no pueden correr (Kraken2 necesita lecturas, no un
+  ensamblaje ya colapsado). En vez de forzar a Snakemake a aceptar un grafo
+  de dependencias incompleto, este modo ejecuta secuencialmente (sin pasar
+  por Snakemake) las herramientas que sí pueden operar solo con un
+  ensamblaje — QUAST, CheckM, Prokka, AMRFinderPlus, ABricate, MLST — con
+  las mismas rutas de archivo que usarían las reglas equivalentes, y
+  reutiliza **sin modificar** `merge_results.py` y `generate_report.py`
+  (ambos ya toleran módulos faltantes desde la parte 17, mostrando "N/D" en
+  las secciones que no corrieron).
+
+**Por qué dos modos y no uno solo vía Snakemake:** se investigó primero si
+`snakemake --touch <archivo>` podía "fingir" que el ensamblaje ya pasó por
+fastp/SPAdes, dejando que Snakemake corriera únicamente los pasos
+posteriores. Funcionó en un primer experimento aislado, pero al repetirlo
+con la tabla de muestras real (3 muestras curadas + 1 ad-hoc) el
+comportamiento cambió — Snakemake volvía a exigir todo el ciclo
+descarga→fastp→SPAdes para las 4 muestras, porque los pasos de agregación
+(`combine_fastp`, etc.) necesitan datos de *todas* las muestras en
+`SAMPLES`, no solo la nueva. En vez de depender de un comportamiento de
+`--touch` que resultó no ser consistente entre invocaciones, se optó por la
+ejecución secuencial directa para el modo FASTA — menos elegante, pero
+predecible y verificado.
+
+**Seguridad:** `sample_id` se valida contra un patrón estricto
+(`[A-Za-z0-9_-]{1,64}`) antes de usarse en cualquier ruta de archivo o
+comando, para prevenir *path traversal* (`../../etc/passwd`) e inyección de
+argumentos de shell — probado explícitamente con ambos casos.
+
+**Trazabilidad:** toda muestra cargada por esta interfaz queda con
+`data_source="Carga local ad-hoc (interfaz web)"` en su reporte (visible en
+la sección de identificador/accesiones), y con una accesión SRA/BioSample
+placeholder fija (`SRR000000`/`SAMN00000000`, válida en formato para no
+romper `validate_samples.py`, pero inconfundible como no perteneciente a un
+repositorio público real).
+
+Probado con el cliente de pruebas de Flask (rutas, validación de entrada,
+mensajes de error) y con el servidor real corriendo (`python webapp/app.py`
++ peticiones HTTP reales vía `curl`): la carga de un FASTA se guarda
+correctamente, la tabla de muestras aislada se arma bien, y al no estar
+QUAST instalado en este entorno de desarrollo, el análisis falla de forma
+clara y controlada — visible en la página de estado con el registro de
+ejecución completo, sin colgar el servidor ni perder el rastro del error.
+
+**Nota de un error propio corregido durante las pruebas manuales:** al
+limpiar los artefactos de una prueba con `rm -rf ... logs`, un argumento de
+ruta demasiado genérico borró por accidente toda la carpeta `logs/`
+versionada (incluido su `.gitkeep`) en vez de solo los logs de la muestra de
+prueba. Restaurado de inmediato con `git checkout -- logs/.gitkeep`; sirve
+de recordatorio de por qué este proyecto evita `rm -rf` con comodines
+amplios salvo que cada ruta este bien acotada.
 
 ## Estado del roadmap
 

@@ -32,6 +32,8 @@ results/taxonomy/*
 !results/taxonomy/.gitkeep
 results/amr/*
 !results/amr/.gitkeep
+results/typing/*
+!results/typing/.gitkeep
 results/tables/*
 !results/tables/.gitkeep
 results/statistics/*
@@ -41,3 +43,8 @@ results/reports/*
 
 logs/*
 !logs/.gitkeep
+
+# Interfaz web local (parte 28): carpetas de trabajo por carga (samples.tsv
+# aislado, log, estado) generadas dinamicamente por cada analisis ad-hoc.
+webapp/runs/*
+!webapp/runs/.gitkeep
