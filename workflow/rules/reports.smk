@@ -8,8 +8,13 @@
 # medicion de desempeno). Prokka queda fuera a proposito: la anotacion es
 # informativa/complementaria y no es un objetivo por defecto de "rule all",
 # asi que exigir su archivo de desempeno forzaria a correrla para cada
-# muestra aunque nadie la haya pedido.
-PERFORMANCE_TRACKED_MODULES = ["download", "fastp", "spades", "quast", "checkm", "kraken2", "amrfinder"]
+# muestra aunque nadie la haya pedido. Los modulos "abricate_{database}" se
+# derivan de config.yaml (amr.abricate_databases) en vez de escribirse a mano,
+# para que agregar/quitar una base de datos ahi no desincronice esta lista.
+PERFORMANCE_TRACKED_MODULES = (
+    ["download", "fastp", "spades", "quast", "checkm", "kraken2", "amrfinder"]
+    + [f"abricate_{database}" for database in config["amr"]["abricate_databases"]]
+)
 
 
 rule combine_performance:
@@ -61,6 +66,7 @@ rule merge_results:
         amr_summary="results/tables/amr_summary.tsv",
         reference_comparison="results/tables/reference_comparison.tsv",
         performance_by_sample="results/tables/performance_by_sample.tsv",
+        engine_concordance="results/tables/engine_concordance.tsv",
     output:
         "results/tables/master_results.tsv",
     log:
@@ -78,6 +84,7 @@ rule merge_results:
           --amr-summary {input.amr_summary} \
           --reference-comparison {input.reference_comparison} \
           --performance-by-sample {input.performance_by_sample} \
+          --engine-concordance {input.engine_concordance} \
           --output {output} \
           > {log} 2>&1
         """

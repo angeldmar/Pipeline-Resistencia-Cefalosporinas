@@ -50,3 +50,27 @@ rule run_statistics:
         Rscript workflow/scripts/run_statistics.R {input} {params.output_dir} \
           > {log} 2>&1
         """
+
+
+rule compare_engines_statistics:
+    # Calcula el indice kappa de concordancia ANALITICA entre los dos
+    # motores independientes de deteccion de AMR (AMRFinderPlus y ABricate),
+    # distinto de run_statistics.R (que mide concordancia contra el
+    # estandar de referencia FENOTIPICO). Python (compare_amr_engines.py)
+    # ya dejo los datos preparados; aqui solo se calcula.
+    input:
+        "results/statistics/engine_concordance_input.csv",
+    output:
+        kappa="results/statistics/engine_concordance_kappa.csv",
+        contingency_table="results/statistics/engine_contingency_table.csv",
+    params:
+        output_dir="results/statistics",
+    log:
+        "logs/compare_engines_statistics/run.log",
+    conda:
+        "../envs/r_statistics.yaml"
+    shell:
+        """
+        Rscript workflow/scripts/compare_engines_statistics.R {input} {params.output_dir} \
+          > {log} 2>&1
+        """

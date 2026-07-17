@@ -137,9 +137,14 @@ def main() -> None:
         exit_code, elapsed_seconds, cpu_seconds, max_ram_gb,
     )
 
+    # A stderr, no stdout: algunas herramientas envueltas (ej. abricate)
+    # escriben su resultado real por stdout, y una regla de Snakemake puede
+    # redirigir ese stdout directamente a un archivo de salida. Si este
+    # mensaje fuera a stdout, contaminaria ese archivo con una linea ajena.
     print(
         f"[{args.module}/{args.sample_id}] tiempo: {elapsed_seconds}s, CPU: {cpu_seconds}s, "
-        f"RAM maxima: {max_ram_gb} GB, codigo de salida: {exit_code}"
+        f"RAM maxima: {max_ram_gb} GB, codigo de salida: {exit_code}",
+        file=sys.stderr,
     )
 
     # Propaga el codigo de salida del comando real, para que Snakemake

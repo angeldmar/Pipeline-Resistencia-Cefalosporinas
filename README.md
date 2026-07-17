@@ -970,6 +970,97 @@ fixtures de prueba también pueden tener bugs, no solo el código bajo prueba.
 
 Ejecutar toda la suite: `pytest` (desde la raíz del repositorio).
 
+## Extensiones más allá del diseño original
+
+Tras completar las 24 partes del documento de diseño, se identificaron y
+priorizaron algunas extensiones adicionales, no contempladas en el
+documento original de 23 secciones:
+
+| # | Parte | Estado |
+|---|-------|--------|
+| 25 | Segundo motor de AMR (ABricate) y concordancia analítica entre motores | ✅ Hecho |
+| 26 | Tipificación de secuencia multilocus (MLST) | ⏳ Pendiente |
+| 27 | Descarga de CSV desde el reporte HTML | ⏳ Pendiente |
+| 28 | Interfaz web local para análisis ad-hoc (subir FASTQ/FASTA) | ⏳ Pendiente |
+
+### 25. Segundo motor de AMR (ABricate) y concordancia entre motores
+
+Hasta la parte 24, el pipeline comparaba las detecciones de AMRFinderPlus
+contra dos referencias distintas: el estándar fenotípico (`compare_to_reference.py`)
+y sus propias corridas repetidas (`assess_reproducibility.py`). Ninguna de
+las dos mide si una **segunda herramienta de detección independiente**
+coincide con AMRFinderPlus sobre el mismo ensamblaje — una señal de
+concordancia analítica distinta, y uno de los cuatro pilares que la
+descripción general del proyecto declara como objetivo.
+
+**Decisión metodológica central:** comparar genes por **nombre exacto de
+alelo** entre AMRFinderPlus (catálogo de referencia de NCBI) y ABricate
+(bases de datos CARD + ResFinder) subestimaría artificialmente la
+concordancia real, porque cada base de datos nombra los mismos genes de
+forma distinta. La comparación se hace a nivel de **familia de gen** (misma
+heurística de `derive_gene_family()` ya usada en `parse_amrfinder.py` y
+`compare_to_reference.py`, duplicada aquí siguiendo la convención de scripts
+autocontenidos del proyecto).
+
+**`workflow/scripts/parse_abricate.py`** (nuevo) normaliza la salida cruda de
+ABricate al mismo esquema de columnas que `parse_amrfinder.py`, para que
+ambos motores queden en formato directamente comparable. Acepta varios
+archivos crudos a la vez (uno por base de datos) y los concatena antes de
+normalizar, evitando una regla adicional de Snakemake solo para unir
+archivos. Sigue el mismo patrón `parse`/`combine` de archivo-por-muestra.
+
+**`workflow/scripts/compare_amr_engines.py`** (nuevo) calcula, por muestra,
+la concordancia (exacta y Jaccard) entre los conjuntos de familias de gen
+detectados por cada motor, y prepara además una tabla larga
+(`engine_concordance_input.csv`) con el resultado de cada motor como factor
+`detected`/`not_detected` por combinación muestra+familia — lista para que R
+calcule el índice kappa entre motores. Ningún cálculo estadístico se hace en
+Python, mismo principio ya establecido para toda estadística formal del
+pipeline.
+
+**`workflow/scripts/compare_engines_statistics.R`** (nuevo, script de R
+separado de `run_statistics.R`): calcula el kappa de concordancia
+*entre herramientas*, distinto del kappa de `run_statistics.R` (que mide
+concordancia contra el estándar de referencia *fenotípico*). Mantenerlos
+separados evita mezclar dos preguntas estadísticas distintas en un mismo
+script.
+
+**Bug real encontrado y corregido durante las pruebas:** `run_with_timing.py`
+(el envoltorio de medición de tiempo/RAM usado por todas las herramientas
+externas desde la parte 18) imprimía su resumen de desempeño a `stdout`. Para
+la mayoría de las herramientas esto no importaba, porque su resultado real se
+escribe en archivos propios (`--output`, `--json`, etc.) y el `stdout`
+combinado solo va a un log. Pero ABricate escribe su tabla de resultados
+**directamente a stdout** (`abricate ... > resultado.tsv`), así que la regla
+`abricate` redirige `stdout` al archivo de resultados — lo que habría
+contaminado esa tabla con la línea de estado del envoltorio. Corregido
+enviando ese mensaje a `stderr`, comportamiento correcto para una herramienta
+de línea de comandos en general (datos por `stdout`, mensajes de estado por
+`stderr`), verificado con una prueba dedicada antes y después del cambio.
+
+**Nota de plataforma:** al igual que QUAST/CheckM/Prokka (parte 23),
+**`abricate` no tiene compilación para `osx-arm64`** en bioconda (verificado
+contra la API de anaconda.org), solo para `osx-64` y `linux-64`. Requiere el
+mismo ajuste `CONDA_SUBDIR=osx-64` en esta Mac.
+
+`merge_results.py` incorpora un resumen corto de la concordancia (familias
+detectadas por cada motor, concordancia exacta, Jaccard) a la tabla maestra y
+al reporte HTML individual, en una sección nueva ("Concordancia entre
+motores de AMR"), sin ensanchar la tabla maestra con el detalle completo
+(que sigue viviendo en `engine_concordance.tsv`).
+
+Probado: `parse_abricate.py` normaliza correctamente resultados combinados
+de CARD + ResFinder, calcula bien el umbral de confianza, y maneja sin
+fallar el caso de cero detecciones. `compare_amr_engines.py` distingue
+correctamente una discordancia real (un motor detecta, el otro no) de una
+concordancia por ausencia (ninguno detecta nada). `compare_engines_statistics.R`
+calcula un kappa correcto (0.33) con datos no degenerados, y maneja sin
+fallar tanto el caso de varianza indefinida (kappa con muy pocas
+observaciones sin variabilidad en un "evaluador", advertencia esperada de
+`irr::kappa2`, no un bug) como el caso de tabla completamente vacía. El
+grafo completo de Snakemake (`snakemake -n`) resuelve con las 6 ejecuciones
+de `abricate` esperadas (2 bases de datos × 3 muestras).
+
 ## Estado del roadmap
 
 Las 24 partes del diseño del pipeline están completas. Lo que queda para

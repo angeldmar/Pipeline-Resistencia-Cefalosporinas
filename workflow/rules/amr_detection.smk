@@ -2,8 +2,10 @@
 # amr_detection.smk
 # Deteccion de genes de resistencia antimicrobiana con AMRFinderPlus,
 # clasificacion mecanistica de las beta-lactamasas detectadas (BLEE, AmpC,
-# carbapenemasa) segun config/resistance_targets.yaml, y comparacion contra
-# el estandar de referencia documentado en samples.tsv.
+# carbapenemasa) segun config/resistance_targets.yaml, comparacion contra
+# el estandar de referencia documentado en samples.tsv, y deteccion con un
+# SEGUNDO motor independiente (ABricate/CARD+ResFinder) para medir
+# concordancia analitica entre herramientas.
 # ============================================================================
 
 rule amrfinder:
@@ -124,5 +126,109 @@ rule compare_to_reference:
           --samples {input.samples} \
           --amr-table {input.amr_summary} \
           --output {output} \
+          > {log} 2>&1
+        """
+
+
+rule abricate:
+    # Segundo motor de deteccion de AMR, independiente de AMRFinderPlus.
+    # Se corre UNA vez por (muestra, base de datos) via wildcard; las bases
+    # de datos a usar vienen de config.yaml (amr.abricate_databases).
+    input:
+        assembly="results/assemblies/{sample}/contigs.filtered.fasta",
+    output:
+        table="results/amr/abricate/{sample}_{database}.tsv",
+        performance="results/tables/performance/{sample}_abricate_{database}.tsv",
+    wildcard_constraints:
+        database="|".join(["card", "resfinder"]),
+    log:
+        "logs/abricate/{sample}_{database}.log",
+    conda:
+        "../envs/abricate.yaml"
+    threads:
+        config["threads"]["abricate"]
+    shell:
+        """
+        python workflow/scripts/run_with_timing.py \
+          --sample-id {wildcards.sample} \
+          --module abricate_{wildcards.database} \
+          --threads {threads} \
+          --output {output.performance} \
+          -- \
+          abricate \
+          --db {wildcards.database} \
+          --threads {threads} \
+          {input.assembly} \
+          > {output.table} 2> {log}
+        """
+
+
+rule parse_abricate:
+    # Normaliza y combina la salida de ABricate de TODAS las bases de datos
+    # configuradas para una muestra en una sola tabla individual.
+    input:
+        abricate_outputs=expand(
+            "results/amr/abricate/{{sample}}_{database}.tsv",
+            database=config["amr"]["abricate_databases"],
+        ),
+    output:
+        "results/tables/abricate/{sample}.tsv",
+    log:
+        "logs/parse_abricate/{sample}.log",
+    conda:
+        "../envs/python.yaml"
+    shell:
+        """
+        python workflow/scripts/parse_abricate.py parse {wildcards.sample} {input.abricate_outputs} \
+          --output-dir results/tables/abricate \
+          --minimum-identity {config[amr][minimum_identity]} \
+          --minimum-gene-coverage {config[amr][minimum_gene_coverage]} \
+          > {log} 2>&1
+        """
+
+
+rule combine_abricate:
+    # Junta el listado largo de TODAS las muestras en un unico archivo.
+    input:
+        expand("results/tables/abricate/{sample}.tsv", sample=SAMPLES),
+    output:
+        "results/tables/abricate_summary.tsv",
+    log:
+        "logs/combine_abricate/combine.log",
+    conda:
+        "../envs/python.yaml"
+    shell:
+        """
+        python workflow/scripts/parse_abricate.py combine \
+          --input-dir results/tables/abricate \
+          --output {output} \
+          > {log} 2>&1
+        """
+
+
+rule compare_amr_engines:
+    # Paso de agregacion final: mide concordancia analitica entre los dos
+    # motores de deteccion de AMR (AMRFinderPlus y ABricate), a nivel de
+    # familia de gen. Prepara ademas la tabla larga que R usara para
+    # calcular el indice kappa entre motores (compare_engines_statistics.R).
+    input:
+        samples=config["samples"],
+        amrfinder_table="results/tables/amr_summary.tsv",
+        abricate_table="results/tables/abricate_summary.tsv",
+    output:
+        concordance="results/tables/engine_concordance.tsv",
+        agreement="results/statistics/engine_concordance_input.csv",
+    log:
+        "logs/compare_amr_engines/compare.log",
+    conda:
+        "../envs/python.yaml"
+    shell:
+        """
+        python workflow/scripts/compare_amr_engines.py \
+          --samples {input.samples} \
+          --amrfinder-table {input.amrfinder_table} \
+          --abricate-table {input.abricate_table} \
+          --concordance-output {output.concordance} \
+          --agreement-output {output.agreement} \
           > {log} 2>&1
         """

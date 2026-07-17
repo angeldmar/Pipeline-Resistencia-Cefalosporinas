@@ -132,6 +132,18 @@ mecanística asociada. <strong>No representan una conclusión clínica</strong> 
   <tr><th>Categoría de comparación</th><td>{{ confusion_category }}</td></tr>
 </table>
 
+<h2>Concordancia entre motores de AMR (AMRFinderPlus vs. ABricate)</h2>
+<p>Comparación entre dos herramientas de detección independientes corridas sobre el mismo
+ensamblaje, a nivel de familia de gen (no de alelo exacto, ver nota metodológica en el
+código). Una concordancia baja aquí es una señal de alerta metodológica, distinta de una
+discrepancia contra el estándar de referencia fenotípico.</p>
+<table>
+  <tr><th>Familias detectadas por AMRFinderPlus</th><td>{{ amrfinder_gene_families }}</td></tr>
+  <tr><th>Familias detectadas por ABricate</th><td>{{ abricate_gene_families }}</td></tr>
+  <tr><th>Concordancia exacta</th><td>{{ "Sí" if engine_exact_concordance == 1.0 else "No" }}</td></tr>
+  <tr><th>Similitud de Jaccard</th><td>{{ engine_jaccard_similarity }}</td></tr>
+</table>
+
 <h2>Advertencias</h2>
 {% if warnings %}
 {% for warning in warnings %}

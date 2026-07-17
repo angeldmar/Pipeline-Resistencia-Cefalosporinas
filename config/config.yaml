@@ -28,6 +28,8 @@ threads:
   kraken2: 4
   prokka: 4
   amrfinder: 4
+  abricate: 4
+  mlst: 4
 
 # ----------------------------------------------------------------------------
 # Control de calidad de lecturas crudas (fastp) y estimacion de cobertura.
@@ -68,6 +70,16 @@ amr:
   target_classes:                 # clases de antimicrobianos de interes para este estudio
     - CEPHALOSPORIN
     - BETA-LACTAM
+  abricate_databases:              # bases de datos usadas para el segundo motor de deteccion (ABricate)
+    - card
+    - resfinder
+
+# ----------------------------------------------------------------------------
+# Tipificacion de secuencia multilocus (MLST): contexto epidemiologico
+# (linaje/secuencia tipo) para los genes de resistencia detectados.
+# ----------------------------------------------------------------------------
+mlst:
+  scheme: "ecoli"    # esquema de Achtman (7 genes) para E. coli; "mlst" tambien puede autodetectar si se deja vacio
 
 # ----------------------------------------------------------------------------
 # Pruebas de reproducibilidad: numero de corridas repetidas por muestra

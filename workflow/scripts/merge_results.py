@@ -16,7 +16,10 @@ amr_classified.tsv); aqui solo se agrega un resumen corto (cuantos genes,
 cuales) para tener una vista rapida por muestra. Lo mismo aplica al
 desempeno computacional: aqui solo entran el tiempo TOTAL y la RAM maxima
 por muestra; el detalle por modulo vive en performance_summary.tsv /
-performance_by_module.tsv (ver combine_performance.py).
+performance_by_module.tsv (ver combine_performance.py). La concordancia
+entre motores de AMR (AMRFinderPlus vs. ABricate, ver compare_amr_engines.py)
+tambien se resume en dos columnas cortas; el detalle por familia de gen vive
+en engine_concordance.tsv.
 """
 
 from __future__ import annotations
@@ -107,6 +110,7 @@ def build_master_table(
     amr_table: pd.DataFrame | None,
     reference_comparison_table: pd.DataFrame | None,
     performance_by_sample_table: pd.DataFrame | None = None,
+    engine_concordance_table: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Arma la tabla maestra: parte de samples.tsv (para que TODA muestra
     documentada aparezca, incluso si a algun modulo todavia le falta
@@ -155,6 +159,19 @@ def build_master_table(
         ]
         master_table = master_table.merge(performance_columns, on="sample_id", how="left")
 
+    if engine_concordance_table is not None:
+        # Incluye tambien los conjuntos de familias detectados por cada
+        # motor (texto corto, util para interpretar una discordancia sin
+        # tener que abrir engine_concordance.tsv aparte).
+        engine_columns = engine_concordance_table[
+            ["sample_id", "amrfinder_gene_families", "abricate_gene_families",
+             "exact_gene_family_concordance", "jaccard_similarity"]
+        ].rename(columns={
+            "exact_gene_family_concordance": "engine_exact_concordance",
+            "jaccard_similarity": "engine_jaccard_similarity",
+        })
+        master_table = master_table.merge(engine_columns, on="sample_id", how="left")
+
     available_qc_gate_columns = [
         column for column in QC_GATE_STATUS_COLUMNS if column in master_table.columns
     ]
@@ -182,6 +199,10 @@ def main() -> None:
         "--performance-by-sample", type=Path, default=Path("results/tables/performance_by_sample.tsv"),
         help="Resumen de tiempo total / RAM maxima por muestra (ver combine_performance.py)",
     )
+    parser.add_argument(
+        "--engine-concordance", type=Path, default=Path("results/tables/engine_concordance.tsv"),
+        help="Concordancia AMRFinderPlus vs. ABricate por muestra (ver compare_amr_engines.py)",
+    )
     parser.add_argument("--output", type=Path, default=Path("results/tables/master_results.tsv"))
     args = parser.parse_args()
 
@@ -196,6 +217,7 @@ def main() -> None:
         load_optional_table(args.amr_summary, "deteccion de AMR (AMRFinderPlus)"),
         load_optional_table(args.reference_comparison, "comparacion con el estandar de referencia"),
         load_optional_table(args.performance_by_sample, "desempeño computacional"),
+        load_optional_table(args.engine_concordance, "concordancia entre motores de AMR"),
     )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)

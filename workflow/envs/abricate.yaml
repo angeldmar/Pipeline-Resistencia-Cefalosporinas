@@ -1,0 +1,17 @@
+# Ambiente para las reglas abricate (workflow/rules/amr_detection.smk).
+#
+# ABricate es el segundo motor de deteccion de AMR del pipeline (independiente
+# de AMRFinderPlus), usado para calcular concordancia entre herramientas.
+# Incluye "python" ademas de abricate: run_with_timing.py corre dentro de
+# este mismo ambiente y solo necesita la biblioteca estandar.
+#
+# NOTA de plataforma (igual que QUAST/CheckM/Prokka, ver README parte 23):
+# abricate no tiene compilacion para osx-arm64 en bioconda, solo osx-64 y
+# linux-64. En Apple Silicon requiere CONDA_SUBDIR=osx-64 (emulacion Rosetta 2).
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python
+  - abricate

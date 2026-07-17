@@ -33,8 +33,8 @@ SAMPLES = samples_df["sample_id"].tolist()
 # ----------------------------------------------------------------------------
 # Reglas de cada modulo. SAMPLES debe existir ANTES de este punto: varias
 # reglas de agregacion (combine_fastp, combine_quast, combine_checkm,
-# combine_taxonomy, combine_amr) usan expand(..., sample=SAMPLES) para
-# depender de la tabla de TODAS las muestras a la vez.
+# combine_taxonomy, combine_amr, combine_abricate) usan expand(..., sample=SAMPLES)
+# para depender de la tabla de TODAS las muestras a la vez.
 # ----------------------------------------------------------------------------
 include: "workflow/rules/download.smk"
 include: "workflow/rules/quality_control.smk"
@@ -62,8 +62,10 @@ rule all:
         "results/tables/amr_classified.tsv",
         "results/tables/checkm_exclusions.tsv",
         "results/tables/taxonomy_manual_review.tsv",
+        "results/tables/engine_concordance.tsv",
         "results/statistics/confusion_matrix.txt",
         "results/statistics/classification_metrics.csv",
         "results/statistics/kappa.csv",
         "results/statistics/cv_execution_time.csv",
         "results/statistics/cv_ram_usage.csv",
+        "results/statistics/engine_concordance_kappa.csv",
