@@ -32,6 +32,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+import os
 import re
 import shlex
 import subprocess
@@ -42,6 +43,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RUNS_DIR = Path(__file__).resolve().parent / "runs"
+SNAKEMAKE_CONDA_DIR = REPO_ROOT / ".snakemake" / "conda"
 
 # Solo letras, numeros, guiones y guiones bajos: evita traversal de rutas
 # (../) y caracteres que romperian nombres de archivo o comandos de shell.
@@ -55,6 +57,48 @@ SAMPLE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 PLACEHOLDER_RUN_ACCESSION = "SRR000000"
 PLACEHOLDER_BIOSAMPLE = "SAMN00000000"
 WEBAPP_DATA_SOURCE = "Carga local ad-hoc (interfaz web)"
+
+
+class MissingCondaEnvironmentError(RuntimeError):
+    pass
+
+
+def resolve_conda_env_bin(env_yaml_relative_path: str) -> Path:
+    """Ubica el bin/ del ambiente Conda que Snakemake ya creo para la regla
+    correspondiente (workflow/envs/<tool>.yaml), sin reimplementar el
+    algoritmo de hash interno de Snakemake (no es una API publica ni
+    estable entre versiones). En vez de eso, compara el CONTENIDO del yaml
+    de origen contra los archivos marcador que Snakemake deja en
+    .snakemake/conda/<hash>.yaml -- que son una copia textual exacta del
+    yaml que los genero -- y devuelve el ambiente cuyo .env_setup_done
+    confirma que la instalacion termino, no solo que empezo."""
+    source_content = (REPO_ROOT / env_yaml_relative_path).read_text()
+
+    if SNAKEMAKE_CONDA_DIR.is_dir():
+        for marker in SNAKEMAKE_CONDA_DIR.glob("*.yaml"):
+            if marker.read_text() == source_content:
+                env_hash = marker.stem
+                bin_dir = SNAKEMAKE_CONDA_DIR / env_hash / "bin"
+                if (SNAKEMAKE_CONDA_DIR / f"{env_hash}.env_setup_done").is_file() and bin_dir.is_dir():
+                    return bin_dir
+
+    raise MissingCondaEnvironmentError(
+        f"No se encontro un ambiente Conda ya creado para {env_yaml_relative_path}. "
+        "Crea los ambientes del pipeline primero, por ejemplo con: "
+        "CONDA_SUBDIR=osx-64 snakemake --use-conda --conda-create-envs-only --cores 1"
+    )
+
+
+def _env_with_conda_bin(bin_dir: Path) -> dict[str, str]:
+    """Variables de entorno para invocar una herramienta de un ambiente
+    Conda de Snakemake por subprocess directo (sin pasar por Snakemake ni
+    'conda activate'): antepone el bin/ del ambiente al PATH actual, para
+    que tanto el ejecutable principal como sus dependencias empaquetadas en
+    el mismo ambiente (ej. blastn para abricate, prodigal/hmmer para
+    checkm) se encuentren, igual que si el ambiente estuviera activado."""
+    env = os.environ.copy()
+    env["PATH"] = f"{bin_dir}{os.pathsep}{env.get('PATH', '')}"
+    return env
 
 
 class InvalidSampleIdError(ValueError):
@@ -167,14 +211,14 @@ def launch_fastq_pipeline(sample_id: str, sequencing_platform: str, expected_gen
     threading.Thread(target=_run, daemon=True).start()
 
 
-def _run_and_log(sample_id: str, command: list[str]) -> None:
+def _run_and_log(sample_id: str, command: list[str], env: dict[str, str] | None = None) -> None:
     """Corre un comando y agrega su salida al log de la carga. Lanza
     RuntimeError con un mensaje claro si el comando falla (incluida la
     herramienta no encontrada), para que el hilo de FASTA pueda detenerse
     y marcar la carga como fallida en vez de continuar con datos a medias."""
     _append_log(sample_id, f"Ejecutando: {shlex.join(command)}")
     try:
-        completed = subprocess.run(command, cwd=REPO_ROOT, capture_output=True, text=True)
+        completed = subprocess.run(command, cwd=REPO_ROOT, capture_output=True, text=True, env=env)
     except FileNotFoundError as error:
         raise RuntimeError(f"Herramienta no encontrada: {command[0]} ({error})") from error
 
@@ -210,7 +254,18 @@ def run_fasta_only_pipeline(sample_id: str, assembly_path: Path, expected_genes:
             ):
                 directory.mkdir(parents=True, exist_ok=True)
 
-            def timed(module: str, command: list[str]) -> None:
+            # Estas herramientas solo existen dentro de los ambientes Conda
+            # aislados que Snakemake crea por regla (.snakemake/conda/), no
+            # en el PATH general de la shell -- se resuelven aqui, una sola
+            # vez, y se antepone su bin/ al PATH de cada subprocess que las
+            # invoca (ver resolve_conda_env_bin / _env_with_conda_bin).
+            quast_env = _env_with_conda_bin(resolve_conda_env_bin("workflow/envs/quast.yaml"))
+            checkm_env = _env_with_conda_bin(resolve_conda_env_bin("workflow/envs/checkm.yaml"))
+            amrfinder_env = _env_with_conda_bin(resolve_conda_env_bin("workflow/envs/amrfinder.yaml"))
+            abricate_env = _env_with_conda_bin(resolve_conda_env_bin("workflow/envs/abricate.yaml"))
+            mlst_env = _env_with_conda_bin(resolve_conda_env_bin("workflow/envs/mlst.yaml"))
+
+            def timed(module: str, command: list[str], env: dict[str, str] | None = None) -> None:
                 """Para herramientas con su propio flag de salida (--output,
                 -f, etc.): el resultado va a un archivo declarado, y stdout/
                 stderr combinados (incluido el mensaje de run_with_timing.py)
@@ -220,9 +275,9 @@ def run_fasta_only_pipeline(sample_id: str, assembly_path: Path, expected_genes:
                     "--sample-id", sample_id, "--module", module, "--threads", str(threads),
                     "--output", str(performance_dir / f"{sample_id}_{module}.tsv"),
                     "--", *command,
-                ])
+                ], env=env)
 
-            def timed_to_file(module: str, command: list[str], destination: Path) -> None:
+            def timed_to_file(module: str, command: list[str], destination: Path, env: dict[str, str] | None = None) -> None:
                 """Para herramientas que escriben su resultado por stdout
                 (abricate, mlst): stdout debe ir EXCLUSIVAMENTE al archivo de
                 destino, nunca mezclarse con el log (run_with_timing.py ya
@@ -238,14 +293,17 @@ def run_fasta_only_pipeline(sample_id: str, assembly_path: Path, expected_genes:
                             "--output", str(performance_dir / f"{sample_id}_{module}.tsv"),
                             "--", *command,
                         ],
-                        cwd=REPO_ROOT, stdout=output_handle, stderr=log_handle,
+                        cwd=REPO_ROOT, stdout=output_handle, stderr=log_handle, env=env,
                     )
                 if completed.returncode != 0:
                     raise RuntimeError(f"'{shlex.join(command)}' fallo con codigo {completed.returncode}")
 
             # --- QUAST -----------------------------------------------------
             quast_report = results / "qc" / "quast" / sample_id / "report.tsv"
-            timed("quast", ["quast.py", str(assembly_path), "--output-dir", str(quast_report.parent), "--threads", str(threads)])
+            timed(
+                "quast", ["quast.py", str(assembly_path), "--output-dir", str(quast_report.parent), "--threads", str(threads)],
+                env=quast_env,
+            )
             _run_and_log(sample_id, [
                 sys.executable, str(REPO_ROOT / "workflow/scripts/parse_quast.py"), "parse", sample_id, str(quast_report),
                 "--output-dir", str(tables / "quast"),
@@ -261,11 +319,11 @@ def run_fasta_only_pipeline(sample_id: str, assembly_path: Path, expected_genes:
             checkm_report = results / "qc" / "checkm" / sample_id / "checkm_summary.tsv"
             import shutil
             shutil.copy(assembly_path, checkm_bin_dir / f"{sample_id}.fasta")
-            _run_and_log(sample_id, ["checkm", "data", "setRoot", config["paths"]["checkm_database"]])
+            _run_and_log(sample_id, ["checkm", "data", "setRoot", config["paths"]["checkm_database"]], env=checkm_env)
             timed("checkm", [
                 "checkm", "lineage_wf", "-x", "fasta", "--tab_table", "-f", str(checkm_report),
                 "-t", str(threads), str(checkm_bin_dir), str(checkm_out_dir),
-            ])
+            ], env=checkm_env)
             _run_and_log(sample_id, [
                 sys.executable, str(REPO_ROOT / "workflow/scripts/parse_checkm.py"), "parse", sample_id, str(checkm_report),
                 "--output-dir", str(tables / "checkm"),
@@ -279,7 +337,7 @@ def run_fasta_only_pipeline(sample_id: str, assembly_path: Path, expected_genes:
             timed("amrfinder", [
                 "amrfinder", "--nucleotide", str(assembly_path), "--organism", "Escherichia",
                 "--threads", str(threads), "--output", str(amrfinder_table),
-            ])
+            ], env=amrfinder_env)
             _run_and_log(sample_id, [
                 sys.executable, str(REPO_ROOT / "workflow/scripts/parse_amrfinder.py"), "parse", sample_id, str(amrfinder_table),
                 "--output-dir", str(tables / "amr"),
@@ -301,6 +359,7 @@ def run_fasta_only_pipeline(sample_id: str, assembly_path: Path, expected_genes:
                     f"abricate_{database}",
                     ["abricate", "--db", database, "--threads", str(threads), str(assembly_path)],
                     raw_path,
+                    env=abricate_env,
                 )
                 abricate_raw_paths.append(str(raw_path))
             _run_and_log(sample_id, [
@@ -316,6 +375,7 @@ def run_fasta_only_pipeline(sample_id: str, assembly_path: Path, expected_genes:
                 "mlst",
                 ["mlst", "--scheme", config["mlst"]["scheme"], "--threads", str(threads), str(assembly_path)],
                 mlst_table,
+                env=mlst_env,
             )
             _run_and_log(sample_id, [
                 sys.executable, str(REPO_ROOT / "workflow/scripts/parse_mlst.py"), "parse", sample_id, str(mlst_table),

@@ -1196,9 +1196,9 @@ Probado con el cliente de pruebas de Flask (rutas, validación de entrada,
 mensajes de error) y con el servidor real corriendo (`python webapp/app.py`
 + peticiones HTTP reales vía `curl`): la carga de un FASTA se guarda
 correctamente, la tabla de muestras aislada se arma bien, y al no estar
-QUAST instalado en este entorno de desarrollo, el análisis falla de forma
-clara y controlada — visible en la página de estado con el registro de
-ejecución completo, sin colgar el servidor ni perder el rastro del error.
+QUAST instalado en ese primer entorno de prueba, el análisis fallaba de
+forma clara y controlada — visible en la página de estado con el registro
+de ejecución completo, sin colgar el servidor ni perder el rastro del error.
 
 **Nota de un error propio corregido durante las pruebas manuales:** al
 limpiar los artefactos de una prueba con `rm -rf ... logs`, un argumento de
@@ -1207,6 +1207,41 @@ versionada (incluido su `.gitkeep`) en vez de solo los logs de la muestra de
 prueba. Restaurado de inmediato con `git checkout -- logs/.gitkeep`; sirve
 de recordatorio de por qué este proyecto evita `rm -rf` con comodines
 amplios salvo que cada ruta este bien acotada.
+
+**Prueba de extremo a extremo con herramientas reales instaladas:** tras
+crear los ambientes Conda de `workflow/envs/` y descargar las bases de
+datos externas de AMRFinderPlus (`amrfinder -u`) y CheckM (~1.4 GB,
+`checkm data setRoot`), una carga real vía HTTP reveló dos problemas que
+un servidor con herramientas ya en el `PATH` del sistema no habría
+mostrado:
+
+- **Resolución de herramientas en el modo FASTA:** `pipeline_runner.py`
+  invocaba QUAST, CheckM, AMRFinderPlus, ABricate y MLST por nombre suelto,
+  asumiendo que estaban en el `PATH`. Pero esas herramientas solo existen
+  dentro de los ambientes Conda aislados que Snakemake crea por regla
+  (`.snakemake/conda/<hash>/`), nunca activados para estas llamadas
+  directas de `subprocess`. Se agregó `resolve_conda_env_bin()`, que ubica
+  el ambiente ya creado para un `workflow/envs/<tool>.yaml` dado comparando
+  el contenido de ese archivo contra los marcadores que Snakemake deja en
+  `.snakemake/conda/<hash>.yaml` (copia textual exacta del yaml de origen),
+  en vez de reimplementar el algoritmo de hash interno de Snakemake — no es
+  una API pública ni estable entre versiones. `_env_with_conda_bin()`
+  antepone ese `bin/` al `PATH` de cada subproceso, dando acceso tanto al
+  ejecutable principal como a sus dependencias empaquetadas en el mismo
+  ambiente (`blastn` para ABricate y MLST, `prodigal`/`hmmer`/`pplacer`
+  para CheckM).
+- **QUAST incompatible con Python 3.12+:** sin una versión de Python fijada
+  en `workflow/envs/quast.yaml`, Conda resolvía la última disponible, y
+  QUAST (sin mantenimiento activo desde hace años) falla con
+  `ModuleNotFoundError: No module named 'distutils'` — eliminado de la
+  biblioteca estándar en Python 3.12. Corregido fijando `python<3.12` en
+  ese ambiente.
+
+Con ambos arreglos y las bases de datos en su lugar, una carga real de un
+FASTA sintético completó la cadena entera (QUAST → CheckM → AMRFinderPlus →
+ABricate → MLST → concordancia entre motores → tabla maestra → reporte
+HTML) sin intervención manual, terminando en estado `done` con
+`results/reports/<muestra>.html` generado.
 
 ## Estado del roadmap
 

@@ -2,10 +2,16 @@
 #
 # Incluye "python" ademas de quast: run_with_timing.py corre dentro de este
 # mismo ambiente y solo necesita la biblioteca estandar.
+#
+# python fijado a <3.12: QUAST (sin mantenimiento activo desde hace anios)
+# importa "distutils.version.LooseVersion", eliminado de la biblioteca
+# estandar en Python 3.12. Sin este limite, conda resuelve la ultima
+# version de Python disponible y QUAST falla en tiempo de ejecucion con
+# "ModuleNotFoundError: No module named 'distutils'".
 channels:
   - conda-forge
   - bioconda
   - defaults
 dependencies:
-  - python
+  - python<3.12
   - quast
