@@ -1,13 +1,12 @@
 """Prueba de integracion: normalizacion -> clasificacion -> comparacion de AMR.
 
-Alcance: no hay forma de correr AMRFinderPlus real en este entorno de
-desarrollo (ver seccion "ambientes Conda", QUAST/CheckM/Prokka ni siquiera
-tienen build para esta arquitectura). Esta prueba verifica en cambio el
-contrato REAL entre nuestros propios scripts -- que es donde vive el riesgo
-real de integracion en este pipeline (los formatos que un script produce y
-el siguiente consume) -- encadenando parse_amrfinder.py ->
-classify_cephalosporin_genes.py -> compare_to_reference.py con datos que
-imitan el formato real de salida de AMRFinderPlus.
+Alcance: verifica el contrato REAL entre nuestros propios scripts -- que es
+donde vive el riesgo real de integracion en este pipeline (los formatos que
+un script produce y el siguiente consume) -- encadenando parse_amrfinder.py
+-> classify_cephalosporin_genes.py -> compare_to_reference.py con datos que
+imitan el formato real de salida de AMRFinderPlus (nombres de columna
+confirmados corriendo AMRFinderPlus 4.2.7 real sobre un ensamblaje de E.
+coli, no solo copiados de la documentacion).
 """
 
 import pandas as pd
@@ -21,15 +20,15 @@ def build_raw_amrfinder_table() -> pd.DataFrame:
     """Imita el formato de columnas real de AMRFinderPlus (modo --nucleotide)."""
     return pd.DataFrame([
         {
-            "Gene symbol": "blaCTX-M-15", "Sequence name": "CTX-M-15 family class A ESBL",
+            "Element symbol": "blaCTX-M-15", "Element name": "CTX-M-15 family class A ESBL",
             "Class": "BETA-LACTAM", "Subclass": "CEPHALOSPORIN", "Method": "ALLELEX",
-            "% Identity to reference sequence": 100.0, "% Coverage of reference sequence": 100.0,
+            "% Identity to reference": 100.0, "% Coverage of reference": 100.0,
             "Contig id": "contig_1", "Start": 1, "Stop": 900,
         },
         {
-            "Gene symbol": "blaTEM-1", "Sequence name": "TEM family class A beta-lactamase",
+            "Element symbol": "blaTEM-1", "Element name": "TEM family class A beta-lactamase",
             "Class": "BETA-LACTAM", "Subclass": "BETA-LACTAM", "Method": "ALLELEX",
-            "% Identity to reference sequence": 99.5, "% Coverage of reference sequence": 100.0,
+            "% Identity to reference": 99.5, "% Coverage of reference": 100.0,
             "Contig id": "contig_2", "Start": 500, "Stop": 1360,
         },
     ])
@@ -63,7 +62,7 @@ def test_normalized_amr_table_flows_correctly_into_classification_and_comparison
 def test_low_confidence_detection_excluded_from_reference_comparison_but_visible_in_normalized_table():
     # Un unico gen, con cobertura por debajo del umbral (50% < 80%).
     raw_table = build_raw_amrfinder_table().iloc[[1]].copy()
-    raw_table["% Coverage of reference sequence"] = 50.0
+    raw_table["% Coverage of reference"] = 50.0
 
     normalized_table = normalize_amrfinder_table(
         "EC001", raw_table, minimum_identity=90, minimum_gene_coverage=80

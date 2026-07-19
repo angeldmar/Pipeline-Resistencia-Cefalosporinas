@@ -1,14 +1,19 @@
 # Ambiente para la regla checkm (workflow/rules/assembly.smk).
 #
-# checkm-genome trae su propia version de Python como dependencia interna;
-# se agrega "python" explicitamente igual, para que run_with_timing.py
-# (que envuelve "checkm lineage_wf" dentro de este mismo ambiente) tenga
-# garantizado un interprete disponible sin depender de que quede expuesto
-# por casualidad via las dependencias transitivas de checkm-genome.
+# Sin version de Python fijada a proposito: checkm-genome solo tiene
+# variantes compatibles con Python 3 (>=1.1.0) si se acepta pplacer
+# ==1.1.alpha19/20, que no tiene build disponible para osx-64 (la
+# plataforma que usa este proyecto via CONDA_SUBDIR, por la falta de
+# builds nativos osx-arm64 de varias herramientas bioinformaticas -- ver
+# seccion 23 del README). Eso deja como unica opcion instalable a
+# checkm-genome 1.0.x, que arrastra Python 2.7 como dependencia interna
+# incompatible con la sintaxis moderna de run_with_timing.py (list[str]).
+# Por eso la regla checkm invoca run_with_timing.py con {sys.executable}
+# (el interprete que lanzo Snakemake) en vez de con "python" -- que dentro
+# de este ambiente activado resolveria a ese Python 2.7 viejo.
 channels:
   - conda-forge
   - bioconda
   - defaults
 dependencies:
-  - python
   - checkm-genome

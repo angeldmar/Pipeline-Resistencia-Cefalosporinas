@@ -11,6 +11,12 @@ rule spades:
     # Ensambla de novo las lecturas ya recortadas/filtradas (results/trimmed/)
     # en contigs. --careful reduce errores de ensamblaje (mismatches/indels)
     # a costa de mayor tiempo de computo, adecuado para genomas bacterianos.
+    # --phred-offset 33 fijo: sin este flag, SPAdes intenta autodetectar el
+    # offset a partir de la variabilidad de calidades en las lecturas, y
+    # falla ("Failed to determine offset!") si esa variabilidad es baja.
+    # Phred+33 es el estandar universal en datos Illumina desde ~2011 (el
+    # antiguo Phred+64 esta obsoleto), asi que fijarlo evita depender de esa
+    # heuristica sin perder generalidad.
     input:
         r1="results/trimmed/{sample}_R1.fastq.gz",
         r2="results/trimmed/{sample}_R2.fastq.gz",
@@ -39,6 +45,7 @@ rule spades:
           -o {params.outdir} \
           -t {threads} \
           --careful \
+          --phred-offset 33 \
           > {log} 2>&1
         """
 
@@ -164,11 +171,17 @@ rule checkm:
     threads:
         config["threads"]["checkm"]
     shell:
+        # {sys.executable} en vez de "python": el ambiente de checkm no
+        # puede tener un Python moderno (ver comentario en
+        # workflow/envs/checkm.yaml), asi que run_with_timing.py se invoca
+        # con el interprete que lanzo Snakemake -- que no depende del
+        # ambiente activado para esta regla -- en vez de con el Python 2.7
+        # que trae CheckM como dependencia interna.
         """
         mkdir -p {params.bin_dir}
         cp {input} {params.bin_dir}/{wildcards.sample}.fasta
         checkm data setRoot {params.database} > {log} 2>&1
-        python workflow/scripts/run_with_timing.py \
+        {sys.executable} workflow/scripts/run_with_timing.py \
           --sample-id {wildcards.sample} \
           --module checkm \
           --threads {threads} \

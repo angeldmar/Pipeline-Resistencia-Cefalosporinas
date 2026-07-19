@@ -182,6 +182,44 @@ def save_uploaded_fasta(sample_id: str, fasta_storage) -> Path:
     return assembly_path
 
 
+def _touch_raw_fastq_files(sample_id: str) -> None:
+    """Actualiza la fecha de modificacion de los FASTQ ya subidos a "ahora".
+    create_isolated_samples_file() se llama DESPUES de guardar esos FASTQ
+    (ver launch_fastq_pipeline), asi que sin esto, samples.tsv (entrada de
+    la regla download_sample) queda con una fecha mas reciente que sus
+    propias salidas (data/raw/{sample}_R1/R2.fastq.gz) -- Snakemake
+    interpretaria eso como "salida desactualizada" y reintentaria descargar
+    la accesion SRA placeholder (SRR000000, invalida) en vez de usar los
+    FASTQ recien subidos."""
+    raw_dir = REPO_ROOT / "data" / "raw"
+    for suffix in ("R1", "R2"):
+        path = raw_dir / f"{sample_id}_{suffix}.fastq.gz"
+        if path.is_file():
+            path.touch()
+
+
+def _write_placeholder_download_performance(sample_id: str) -> None:
+    """Crea la tercera salida declarada de la regla download_sample
+    (el registro de desempeno de la "descarga", en ceros) para que
+    Snakemake la vea como ya satisfecha y NO reintente descargar la
+    accesion SRA placeholder. Sin esto, aunque los FASTQ ya esten en su
+    lugar (ver _touch_raw_fastq_files), Snakemake igual dispara
+    download_sample por faltarle esta salida -- y si esa descarga falla
+    (la accesion placeholder es invalida), el mecanismo de limpieza de
+    Snakemake borra TODAS las salidas declaradas de la regla fallida,
+    incluidos los FASTQ reales que nunca se tocaron. Mismo esquema de
+    columnas que escribe run_with_timing.py (ver PERFORMANCE_LOG_COLUMNS),
+    para que combine_performance.py lo lea sin problema."""
+    performance_path = REPO_ROOT / "results" / "tables" / "performance" / f"{sample_id}_download.tsv"
+    performance_path.parent.mkdir(parents=True, exist_ok=True)
+    columns = ["sample_id", "module", "elapsed_seconds", "cpu_seconds", "max_ram_gb", "exit_code", "threads", "run_date"]
+    row = [
+        sample_id, "download", "0", "0", "0", "0", "0",
+        datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+    ]
+    performance_path.write_text("\t".join(columns) + "\n" + "\t".join(row) + "\n")
+
+
 def _append_log(sample_id: str, message: str) -> None:
     with open(log_file(sample_id), "a") as handle:
         handle.write(f"[{datetime.now(timezone.utc).isoformat()}] {message}\n")
@@ -191,6 +229,8 @@ def launch_fastq_pipeline(sample_id: str, sequencing_platform: str, expected_gen
     """Lanza el pipeline COMPLETO via Snakemake, en un proceso en segundo
     plano. No bloquea la peticion HTTP que la dispara."""
     samples_path = create_isolated_samples_file(sample_id, sequencing_platform, expected_genes)
+    _touch_raw_fastq_files(sample_id)
+    _write_placeholder_download_performance(sample_id)
     write_status(sample_id, "running")
 
     command = [
@@ -198,8 +238,12 @@ def launch_fastq_pipeline(sample_id: str, sequencing_platform: str, expected_gen
         "--use-conda",
         "--cores", str(threads),
         "--rerun-incomplete",
-        f"--config", f"samples={samples_path}",
         str(report_path(sample_id).relative_to(REPO_ROOT)),
+        # "--config" espera uno o mas pares clave=valor (nargs="+") y
+        # consume todo lo que le siga en la linea de comandos: si el
+        # archivo objetivo fuera despues, Snakemake lo interpretaria como
+        # otro par clave=valor invalido. Por eso va al final.
+        "--config", f"samples={samples_path}",
     ]
     _append_log(sample_id, f"Comando: {shlex.join(command)}")
 

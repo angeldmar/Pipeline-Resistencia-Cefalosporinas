@@ -32,6 +32,15 @@ def test_derive_gene_family_strips_allele_suffix():
     assert derive_gene_family("blaKPC") == "blaKPC"  # sin sufijo numerico, queda igual
 
 
+def test_derive_gene_family_strips_chained_suffixes():
+    # ResFinder agrega su propio sufijo de desambiguacion interno ademas del
+    # alelo (formato real observado corriendo ABricate/ResFinder real sobre
+    # una muestra con blaCMY-2): "blaCMY-2_1" debe reducirse a "blaCMY", no
+    # quedar a medias en "blaCMY-2" -- que rompería la coincidencia de
+    # familia contra el "blaCMY" que entrega AMRFinderPlus para el mismo gen.
+    assert derive_gene_family("blaCMY-2_1") == "blaCMY"
+
+
 def test_normalize_abricate_table_computes_confidence_threshold():
     raw_table = pd.DataFrame([
         build_raw_abricate_row(gene="blaCTX-M-15", identity=99.78, coverage=100.0),

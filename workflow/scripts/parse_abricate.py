@@ -34,7 +34,15 @@ import pandas as pd
 # importante aqui: CARD/ResFinder y el catalogo de referencia de NCBI
 # (AMRFinderPlus) no siempre nombran el mismo gen de forma identica, asi que
 # la comparacion entre motores se hace a nivel de familia, no de alelo exacto.
-ALLELE_SUFFIX_PATTERN = re.compile(r"[-_]\d+(\.\d+)?[A-Za-z]?$")
+#
+# El grupo completo esta envuelto en "(?:...)+" (no solo el sufijo final):
+# ResFinder agrega su propio sufijo de desambiguacion interno ademas del
+# alelo (ej. "blaCMY-2_1" = alelo "-2" + sufijo ResFinder "_1"), y con un
+# solo sufijo final permitido eso quedaba en "blaCMY-2" en vez de "blaCMY"
+# -- rompiendo la coincidencia de familia contra el "blaCMY" que entrega
+# AMRFinderPlus para el mismo gen real. Repetir el grupo quita TODOS los
+# sufijos finales encadenados, no solo el ultimo.
+ALLELE_SUFFIX_PATTERN = re.compile(r"(?:[-_]\d+(?:\.\d+)?[A-Za-z]?)+$")
 
 
 def derive_gene_family(gene_symbol: str) -> str:

@@ -46,12 +46,19 @@ AMR_LONG_TABLE_COLUMNS = [
 
 # Heuristica para separar la "familia" de gen del sufijo de alelo (ej.
 # "blaCTX-M-15" -> familia "blaCTX-M", alelo "blaCTX-M-15"). AMRFinderPlus no
-# entrega familia y alelo como columnas separadas: su "Gene symbol" ya
+# entrega familia y alelo como columnas separadas: su "Element symbol" ya
 # identifica el alelo especifico cuando el metodo de deteccion es ALLELEX o
 # EXACTX. Esto es solo descriptivo (para la tabla de salida); la
 # clasificacion BLEE/AmpC/carbapenemasa en classify_cephalosporin_genes.py
 # compara directamente contra el simbolo completo, no contra esta familia.
-ALLELE_SUFFIX_PATTERN = re.compile(r"[-_]\d+(\.\d+)?[A-Za-z]?$")
+#
+# El grupo completo esta envuelto en "(?:...)+" (no solo el sufijo final):
+# algunos catalogos (ej. ResFinder, via parse_abricate.py -- misma
+# heuristica duplicada a proposito) agregan mas de un sufijo encadenado
+# (alelo + desambiguacion interna), y con un solo sufijo final permitido
+# la familia derivada no reducia del todo, rompiendo la coincidencia entre
+# motores. Repetir el grupo quita TODOS los sufijos finales encadenados.
+ALLELE_SUFFIX_PATTERN = re.compile(r"(?:[-_]\d+(?:\.\d+)?[A-Za-z]?)+$")
 
 
 def derive_gene_family(gene_symbol: str) -> str:
@@ -80,16 +87,16 @@ def normalize_amrfinder_table(
 
     normalized_rows = []
     for _, raw_row in raw_amrfinder_table.iterrows():
-        gene_symbol = str(raw_row["Gene symbol"])
-        percent_identity = float(raw_row["% Identity to reference sequence"])
-        percent_coverage = float(raw_row["% Coverage of reference sequence"])
+        gene_symbol = str(raw_row["Element symbol"])
+        percent_identity = float(raw_row["% Identity to reference"])
+        percent_coverage = float(raw_row["% Coverage of reference"])
 
         normalized_rows.append({
             "sample_id": sample_id,
             "gene_symbol": gene_symbol,
             "gene_family": derive_gene_family(gene_symbol),
             "allele": gene_symbol,
-            "sequence_name": raw_row["Sequence name"],
+            "sequence_name": raw_row["Element name"],
             "antimicrobial_class": raw_row["Class"],
             "antimicrobial_subclass": raw_row["Subclass"],
             "detection_method": raw_row["Method"],

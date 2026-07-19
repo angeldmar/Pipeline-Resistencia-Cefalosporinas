@@ -1243,6 +1243,96 @@ ABricate → MLST → concordancia entre motores → tabla maestra → reporte
 HTML) sin intervención manual, terminando en estado `done` con
 `results/reports/<muestra>.html` generado.
 
+**Modo FASTQ (pipeline completo vía Snakemake) probado con datos reales:**
+con las 12 herramientas instaladas y las bases de datos de AMRFinderPlus,
+CheckM y Kraken2 (Standard-8, ~8 GB) descargadas, se corrió el pipeline
+completo dos veces — una con un FASTQ sintético (para aislar bugs de forma
+rápida) y otra con una muestra pública real de *E. coli* (`ERR17582235`,
+ENA). Ambas rondas revelaron problemas reales, todos corregidos:
+
+- **Orden de argumentos de Snakemake:** `launch_fastq_pipeline()` pasaba
+  `--config samples=...` *antes* del archivo objetivo en la línea de
+  comandos. `--config` acepta uno o más pares `clave=valor` (`nargs="+"`)
+  y Snakemake se tragaba el archivo objetivo como si fuera otro par
+  inválido. Corregido moviendo `--config` al final.
+- **Pérdida de datos por un `download_sample` innecesario:** la tabla de
+  muestras aislada se crea *después* de guardar el FASTQ subido, así que
+  Snakemake veía la tercera salida declarada de `download_sample` (el
+  registro de desempeño) como faltante y reintentaba "descargar" la
+  accesión SRA placeholder (inválida) — y al fallar esa descarga, el
+  mecanismo de limpieza de Snakemake borraba **las tres** salidas
+  declaradas de la regla, incluidos los FASTQ reales recién subidos que
+  nunca se habían tocado. Corregido con `_touch_raw_fastq_files()` (para
+  que los FASTQ no queden más viejos que `samples.tsv`) y
+  `_write_placeholder_download_performance()` (que crea directamente esa
+  tercera salida en ceros, para que Snakemake nunca dispare la regla).
+- **SPAdes no detectaba el offset PHRED en datos sintéticos:** con lecturas
+  de calidad poco variable, `spades-hammer` fallaba con
+  "Failed to determine offset!". Con datos reales de ENA nunca ocurrió (la
+  variabilidad natural de un secuenciador real es suficiente), pero se fijó
+  `--phred-offset 33` en la regla `spades` de todos modos, como red de
+  seguridad — es el estándar universal en Illumina desde ~2011, así que no
+  pierde generalidad.
+- **CheckM con Python 2.7 interno rompía `run_with_timing.py`:** primera
+  vez que la regla `checkm` corrió de verdad (antes solo se había probado
+  el parser con reportes sintéticos). Su ambiente Conda solo puede resolver
+  con CheckM 1.0.x (Python 2.7 interno): las versiones de CheckM
+  compatibles con Python 3 (≥1.1.0) requieren `pplacer==1.1.alpha19/20`,
+  sin build disponible para `osx-64`. Como Snakemake activa ese ambiente
+  para toda la regla, `python workflow/scripts/run_with_timing.py`
+  resolvía a ese Python 2.7, que no entiende la sintaxis de tipos del
+  script (`list[str]`). Corregido invocándolo con `{sys.executable}` (el
+  intérprete que lanzó Snakemake) en vez de con `"python"`.
+- **AMRFinderPlus resuelve su base de datos vía `CONDA_PREFIX`, no vía la
+  ruta del ejecutable:** la base descargada manualmente con `amrfinder -u`
+  quedó en el ambiente activo de la terminal en ese momento, no en el
+  ambiente Conda que Snakemake activa de verdad para la regla `amrfinder`
+  (`source activate <ambiente>` cambia `CONDA_PREFIX`, y AMRFinderPlus
+  calcula la ruta de su base a partir de esa variable, no del ejecutable
+  que se está corriendo). Corregido descargando la base de nuevo con ese
+  mismo ambiente activado explícitamente.
+- **`parse_amrfinder.py` con nombres de columna obsoletos:** escrito y
+  probado contra un esquema de columnas de AMRFinderPlus más viejo. La
+  versión real instalada (4.2.7) renombró `"Gene symbol"` →
+  `"Element symbol"`, `"Sequence name"` → `"Element name"`,
+  `"% Identity to reference sequence"` → `"% Identity to reference"` y
+  `"% Coverage of reference sequence"` → `"% Coverage of reference"`. Las
+  fixtures sintéticas de las pruebas usaban el esquema viejo, por lo que
+  el desfase nunca se detectó hasta correr la herramienta real. Corregido
+  el script y las fixtures de `tests/integration/test_amr_detection_pipeline.py`
+  y `tests/e2e/test_full_sample_report.py`.
+- **`derive_gene_family()` no quitaba sufijos de alelo encadenados:** con
+  la muestra real de ENA, AMRFinderPlus reportó `blaCMY-2` (familia
+  `blaCMY`) y ABricate/ResFinder reportó el mismo gen real como
+  `blaCMY-2_1` — ResFinder agrega su propio sufijo de desambiguación
+  interno además del alelo. La expresión regular solo quitaba **un**
+  sufijo final, dejando `blaCMY-2` en vez de `blaCMY`, y rompiendo la
+  coincidencia de familia entre motores (concordancia Jaccard en 0.0 pese
+  a tratarse del mismo gen). Corregido envolviendo el grupo completo en
+  `(?:...)+` para quitar todos los sufijos finales encadenados, no solo
+  el último — mismo arreglo duplicado en `parse_amrfinder.py` y
+  `parse_abricate.py`, con una prueba de regresión nueva.
+
+**Resultado de la corrida real completa** (`ERR17582235`, aislado de la
+muestra base con `pplacer`, `hmmer`, `blastn`, etc. reales): ensamblaje de
+4.69 Mb en 54 contigs (N50 296 kb), CheckM 99.93 % completitud / 0.26 %
+contaminación, AMRFinderPlus detectó `blaCMY-2` (AmpC, exactamente el tipo
+de gen que este pipeline busca) más mutaciones puntuales en `gyrA`/`parC`/
+`parE`/`uhpT`, MLST resolvió ST 632 del esquema *ecoli*, y ABricate
+concordó en `blaCMY` (más un conjunto mucho más amplio de genes intrínsecos
+de CARD — bombas de eflujo, reguladores — que AMRFinderPlus no reporta por
+diseño, de ahí que la concordancia Jaccard sea baja aunque la detección
+central coincida). Kraken2 sí identificó *Escherichia coli* como taxón
+predominante, pero solo el 4.71&nbsp;% de las lecturas resolvieron a nivel
+de especie (90.52&nbsp;% se quedó en el nivel de familia,
+*Enterobacteriaceae*) — comportamiento documentado de la base de datos
+Kraken2 "Standard-8" (recortada a 8&nbsp;GB): para caber en ese tamaño
+sacrifica resolución en géneros con muchos genomas de referencia cercanos
+en RefSeq, como *E. coli*. El pipeline marcó correctamente `taxonomy_status:
+FAIL` en vez de aceptar una clasificación de baja confianza en silencio —
+la base de datos completa de Kraken2 (sin recortar, ~100&nbsp;GB+)
+resolvería esto con más precisión, pero no se instaló por su tamaño.
+
 ## Estado del roadmap
 
 Las 24 partes del diseño del pipeline están completas. Lo que queda para

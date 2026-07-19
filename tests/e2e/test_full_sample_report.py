@@ -97,9 +97,9 @@ def test_full_pipeline_from_tool_outputs_to_html_report(tmp_path, repo_root):
 
     # --- 5. AMRFinderPlus: tabla con formato real ---------------------------
     raw_amrfinder_table = pd.DataFrame([{
-        "Gene symbol": "blaCTX-M-15", "Sequence name": "CTX-M-15 family class A ESBL",
+        "Element symbol": "blaCTX-M-15", "Element name": "CTX-M-15 family class A ESBL",
         "Class": "BETA-LACTAM", "Subclass": "CEPHALOSPORIN", "Method": "ALLELEX",
-        "% Identity to reference sequence": 100.0, "% Coverage of reference sequence": 100.0,
+        "% Identity to reference": 100.0, "% Coverage of reference": 100.0,
         "Contig id": "contig_1", "Start": 1, "Stop": 900,
     }])
     normalized_amr_table = normalize_amrfinder_table(

@@ -19,6 +19,8 @@ data/raw/*
 !data/raw/.gitkeep
 data/reference/*
 !data/reference/.gitkeep
+data/metadata/*
+!data/metadata/.gitkeep
 
 results/qc/*
 !results/qc/.gitkeep
