@@ -33,7 +33,7 @@ AMR, etc.) viven en archivos YAML dentro de `config/`, nunca fijados dentro de l
 scripts.
 
 ## Estructura del proyecto
-
+  
 ```
 .
 ├── Snakefile
@@ -1332,6 +1332,21 @@ en RefSeq, como *E. coli*. El pipeline marcó correctamente `taxonomy_status:
 FAIL` en vez de aceptar una clasificación de baja confianza en silencio —
 la base de datos completa de Kraken2 (sin recortar, ~100&nbsp;GB+)
 resolvería esto con más precisión, pero no se instaló por su tamaño.
+
+**Confirmación por la interfaz web (no solo por línea de comandos):** con
+todos los arreglos anteriores ya aplicados, se subió la misma muestra real
+(`ERR17582235`) como FASTQ pareado directamente desde la interfaz —
+`launch_fastq_pipeline()` lanzando Snakemake real en segundo plano, sin
+intervención manual — con un identificador nuevo (`EC_WEBAPP_REAL01`), para
+descartar que los arreglos solo funcionaran al invocar Snakemake a mano.
+El resultado fue prácticamente idéntico al de la corrida por línea de
+comandos de la misma muestra: mismo ensamblaje (4,693,984&nbsp;pb, 54
+contigs, N50 296,271), misma completitud/contaminación de CheckM
+(99.93&nbsp;% / 0.26&nbsp;%), los mismos 6 genes detectados por
+AMRFinderPlus (incluido `blaCMY-2`), el mismo ST 632 de MLST, y la misma
+concordancia Jaccard entre motores (0.0208) — confirmando que el camino de
+la interfaz web es reproducible y no depende de nada específico de haber
+corrido el pipeline a mano primero.
 
 ## Estado del roadmap
 
