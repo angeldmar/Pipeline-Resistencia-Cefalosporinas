@@ -50,3 +50,10 @@ logs/*
 # aislado, log, estado) generadas dinamicamente por cada analisis ad-hoc.
 webapp/runs/*
 !webapp/runs/.gitkeep
+
+# Seccion de validacion estadistica: muestras reales y resultados que se
+# aportaran para ese analisis, mismo criterio que data/ y results/.
+validacion_estadistica/muestras/*
+!validacion_estadistica/muestras/.gitkeep
+validacion_estadistica/resultados/*
+!validacion_estadistica/resultados/.gitkeep

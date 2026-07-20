@@ -60,6 +60,7 @@ taxonomy:
   minimum_ecoli_percentage: 90        # % de lecturas asignadas a E. coli para PASS
   warning_ecoli_percentage: 70         # entre este valor y minimum_ecoli_percentage -> WARNING
   maximum_contaminant_percentage: 5     # % maximo de otras especies para seguir considerando PASS
+  shigella_review_threshold_percentage: 0.1  # % minimo de Shigella para marcar revision manual (por encima de ruido tipico de clasificacion)
 
 # ----------------------------------------------------------------------------
 # Deteccion de resistencia antimicrobiana (AMRFinderPlus).

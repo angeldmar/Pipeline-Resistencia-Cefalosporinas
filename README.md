@@ -354,7 +354,7 @@ desde la parte 4).
 del documento): *Shigella* es genómicamente tan cercana a *E. coli* que
 históricamente se consideraron la misma especie. Si Kraken2 asigna lecturas a
 *Shigella*, el script **no** las suma al porcentaje de "otras especies" que
-dispararía un FAIL — en vez de eso, marca `requires_manual_review=True` y dejo
+dispararía un FAIL — en vez de eso, marca `requires_manual_review=True` y deja
 un registro aparte (`results/tables/taxonomy_manual_review.tsv`) con esas
 muestras, para que un analista decida caso por caso. Esto implementa
 literalmente la instrucción del documento de no excluir automáticamente estos
@@ -370,6 +370,18 @@ Probado con tres reportes Kraken2 sintéticos (formato real, jerárquico):
 - 40% *E. coli* con 45% *Klebsiella pneumoniae* → **FAIL**, y el taxón
   predominante se identifica correctamente como *Klebsiella pneumoniae* (no
   se asume que el taxón predominante sea siempre *E. coli*).
+
+**Ajuste posterior — umbral mínimo de ruido para la revisión manual:** la
+regla original disparaba `requires_manual_review` con *cualquier* porcentaje
+de *Shigella* mayor a cero. Al correr el pipeline contra una muestra real
+(`ERR17582235`, sección 28), Kraken2 asignó un rastro de apenas 0.04% de las
+lecturas a *Shigella* — ruido típico de ambigüedad de k-mers entre géneros
+cercanos, presente en casi cualquier corrida real, no una señal genuina de
+mezcla de especies. Con el umbral en cero, la revisión manual se dispararía
+en casi cualquier muestra real, perdiendo utilidad como señal. Se agregó
+`taxonomy.shigella_review_threshold_percentage` (por defecto 0.1%) en
+`config.yaml`: la revisión solo se dispara si el porcentaje de *Shigella*
+supera ese umbral, configurable según qué tan sensible se quiera la alerta.
 
 ### 14. Anotación genómica (Prokka)
 
@@ -1350,19 +1362,32 @@ corrido el pipeline a mano primero.
 
 ## Estado del roadmap
 
-Las 24 partes del diseño del pipeline están completas. Lo que queda para
-llevar esto de "estructura y lógica verificada" a "pipeline ejecutado sobre
-datos reales" (pasos 18–22 de la sección 23 del documento original) no es
-más código, sino **ejecución real**: instalar los ambientes Conda de verdad
-(con el ajuste `CONDA_SUBDIR=osx-64` documentado en la parte 23 si se corre
-en esta Mac, o directamente en Linux), descargar un conjunto real de genomas
-de *E. coli* desde un repositorio público, correr `snakemake --use-conda`
-sobre ellos, revisar los resultados, y solo entonces considerar fijar
-versiones de herramientas y publicar. Ningún paso de esos requiere volver a
-tocar el código del pipeline salvo que la ejecución real revele un problema
-no capturado por las pruebas — que es exactamente el tipo de cosa que estas
-pruebas no pueden garantizar al 100%, dado que ninguna corrió contra la
-herramienta bioinformática real subyacente.
+Las 24 partes del diseño del pipeline están completas, más las extensiones
+25–28. La ejecución real sobre datos biológicos reales (pasos 18–22 de la
+sección 23 del documento original) ya se hizo: ambientes Conda instalados
+de verdad (`CONDA_SUBDIR=osx-64`), bases de datos de referencia
+descargadas (AMRFinderPlus, CheckM, Kraken2), y el pipeline completo
+corrido dos veces sobre una muestra pública real de *E. coli* (`ERR17582235`,
+ENA) — una vez por línea de comandos y otra por la interfaz web — con
+resultados idénticos entre ambos caminos (sección 28). Esa ejecución real
+encontró y corrigió una serie de problemas invisibles a las pruebas con
+datos sintéticos (desfases de esquema de columnas entre versiones de
+herramientas, resolución de rutas de bases de datos vía variables de
+entorno, límites de versión de Python en ambientes Conda, entre otros,
+todos documentados arriba). Queda como trabajo futuro fijar versiones
+exactas de herramientas antes de publicar un release, y decidir si instalar
+la base de datos completa de Kraken2 (sin recortar) para mejorar la
+resolución de especie.
+
+**Segunda sección del proyecto — validación estadística:** además de la
+herramienta operativa (este pipeline y su interfaz web), el proyecto tendrá
+una sección separada para validar estadísticamente las predicciones
+genotípicas contra fenotipos de referencia documentados, usando muestras
+reales aportadas para ese fin. La estructura ya está creada en
+`validacion_estadistica/` (`muestras/`, `resultados/`, y un notebook de R
+`notebooks/validacion_estadistica.ipynb` con apartados para muestras
+reales, resultados por muestra y una discusión final) — sin contenido
+todavía, a la espera de esas muestras.
 
 ## Licencia
 

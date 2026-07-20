@@ -16,6 +16,14 @@ se suman al porcentaje de "otras especies" que dispara un FAIL, y en cambio
 la muestra se marca con requires_manual_review=True para que un analista
 revise el caso manualmente, en vez de excluirla o aceptarla automaticamente.
 
+La revision se dispara si el % de Shigella supera
+shigella_review_threshold_percentage (config: taxonomy, por defecto 0.1%),
+no con cualquier valor mayor a cero: en datos reales, Kraken2 casi siempre
+asigna un rastro minimo de lecturas a generos cercanos por ambiguedad de
+k-mers, sin que eso sea una senal real de mezcla de especies -- un umbral
+en cero convertiria la revision manual en una alerta que se dispara casi
+siempre, restandole utilidad como senal.
+
 Subcomandos:
 
   parse   -> lee el report.tsv de Kraken2 de UNA muestra y escribe su fila de
@@ -97,6 +105,7 @@ def extract_taxonomy_metrics(
     minimum_ecoli_percentage: float,
     warning_ecoli_percentage: float,
     maximum_contaminant_percentage: float,
+    shigella_review_threshold_percentage: float = 0.1,
 ) -> dict:
     """Reduce el reporte completo de Kraken2 a las metricas de interes del
     pipeline, aplicando la regla especial de Shigella descrita arriba."""
@@ -109,10 +118,11 @@ def extract_taxonomy_metrics(
         species_level_rows["name"].str.startswith(CLOSE_RELATIVE_GENUS_NAME)
     ]
     shigella_percentage = round(float(shigella_rows["percentage"].sum()), 2)
-    # Cualquier presencia de Shigella, por pequena que sea, dispara la
-    # revision manual: la decision de si es contaminacion real o solapamiento
-    # taxonomico normal le corresponde a un analista, no al pipeline.
-    requires_manual_review = shigella_percentage > 0.0
+    # Un umbral minimo (no cero) evita que ruido tipico de clasificacion
+    # (ambiguedad de k-mers entre generos cercanos, presente en casi toda
+    # corrida real) dispare la revision manual de forma constante; ver
+    # docstring del modulo.
+    requires_manual_review = shigella_percentage > shigella_review_threshold_percentage
 
     other_species_rows = species_level_rows.loc[
         (species_level_rows["name"] != TARGET_SPECIES_NAME)
@@ -184,11 +194,13 @@ def run_parse_command(
     minimum_ecoli_percentage: float,
     warning_ecoli_percentage: float,
     maximum_contaminant_percentage: float,
+    shigella_review_threshold_percentage: float,
 ) -> None:
     kraken2_report = load_kraken2_report(kraken2_report_path)
     sample_metrics = extract_taxonomy_metrics(
         sample_id, kraken2_report,
         minimum_ecoli_percentage, warning_ecoli_percentage, maximum_contaminant_percentage,
+        shigella_review_threshold_percentage,
     )
     output_path = write_per_sample_table(sample_metrics, output_dir)
     print(
@@ -243,6 +255,11 @@ def main() -> None:
         "--maximum-contaminant-percentage", type=float, default=5.0,
         help="%% maximo de otras especies (sin contar Shigella) para PASS (config: taxonomy.maximum_contaminant_percentage)",
     )
+    parse_command.add_argument(
+        "--shigella-review-threshold-percentage", type=float, default=0.1,
+        help="%% minimo de Shigella para marcar revision manual, por encima de ruido tipico de "
+             "clasificacion (config: taxonomy.shigella_review_threshold_percentage)",
+    )
 
     combine_command = subcommands.add_parser(
         "combine", help="Combinar las tablas individuales en un resumen y un registro de revision manual"
@@ -266,6 +283,7 @@ def main() -> None:
         run_parse_command(
             args.sample_id, args.kraken2_report, args.output_dir,
             args.minimum_ecoli_percentage, args.warning_ecoli_percentage, args.maximum_contaminant_percentage,
+            args.shigella_review_threshold_percentage,
         )
     elif args.command == "combine":
         run_combine_command(args.input_dir, args.output, args.manual_review_output)

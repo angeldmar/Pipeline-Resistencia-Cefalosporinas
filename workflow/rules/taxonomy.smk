@@ -68,6 +68,7 @@ rule parse_kraken2:
           --minimum-ecoli-percentage {config[taxonomy][minimum_ecoli_percentage]} \
           --warning-ecoli-percentage {config[taxonomy][warning_ecoli_percentage]} \
           --maximum-contaminant-percentage {config[taxonomy][maximum_contaminant_percentage]} \
+          --shigella-review-threshold-percentage {config[taxonomy][shigella_review_threshold_percentage]} \
           > {log} 2>&1
         """
 

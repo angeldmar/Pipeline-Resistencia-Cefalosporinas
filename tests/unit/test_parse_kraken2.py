@@ -34,7 +34,8 @@ def build_kraken2_report(rows: list[tuple[float, str, str]]) -> pd.DataFrame:
 def test_shigella_excluded_from_contamination_but_flags_manual_review():
     # Caso central de la parte 13: una muestra con 85% E. coli + 10%
     # Shigella no debe tratar ese 10% como contaminacion (los cuenta aparte),
-    # pero SI debe marcarse para revision manual.
+    # pero SI debe marcarse para revision manual (muy por encima del umbral
+    # de ruido por defecto, 0.1%).
     report = build_kraken2_report([
         (85.0, "S", "Escherichia coli"),
         (10.0, "S", "Shigella flexneri"),
@@ -48,6 +49,41 @@ def test_shigella_excluded_from_contamination_but_flags_manual_review():
     assert metrics["requires_manual_review"] is True
     # 85% no alcanza el 90% de PASS, independientemente de Shigella.
     assert metrics["taxonomy_status"] == "WARNING"
+
+
+def test_shigella_trace_below_noise_threshold_does_not_flag_manual_review():
+    # Encontrado con datos reales (ERR17582235): Kraken2 asigna un rastro
+    # minimo de lecturas a Shigella por ambiguedad de k-mers entre generos
+    # cercanos, sin que sea una senal real de mezcla de especies. Por debajo
+    # del umbral configurado (0.1% por defecto), NO debe disparar revision
+    # manual -- si cualquier valor mayor a cero la disparara, la alerta
+    # perderia utilidad al activarse casi siempre en datos reales.
+    report = build_kraken2_report([
+        (94.85, "S", "Escherichia coli"),
+        (0.04, "S", "Shigella sonnei"),
+    ])
+
+    metrics = extract_taxonomy_metrics("EC_TRACE_SHIGELLA", report, **DEFAULT_THRESHOLDS)
+
+    assert metrics["shigella_percentage"] == 0.04
+    assert metrics["requires_manual_review"] is False
+
+
+def test_shigella_review_threshold_is_configurable():
+    report = build_kraken2_report([
+        (94.0, "S", "Escherichia coli"),
+        (0.5, "S", "Shigella sonnei"),
+    ])
+
+    # Con el umbral por defecto (0.1%), 0.5% si dispara revision.
+    default_metrics = extract_taxonomy_metrics("EC_CONFIG_DEFAULT", report, **DEFAULT_THRESHOLDS)
+    assert default_metrics["requires_manual_review"] is True
+
+    # Con un umbral mas alto que la senal observada, no deberia dispararse.
+    strict_metrics = extract_taxonomy_metrics(
+        "EC_CONFIG_STRICT", report, **DEFAULT_THRESHOLDS, shigella_review_threshold_percentage=1.0
+    )
+    assert strict_metrics["requires_manual_review"] is False
 
 
 def test_predominant_taxon_is_not_assumed_to_be_ecoli():
