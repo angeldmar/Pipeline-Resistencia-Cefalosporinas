@@ -26,7 +26,7 @@ def test_tem_with_extended_spectrum_subclass_is_esbl(repo_root):
 
 def test_tem_without_extended_spectrum_subclass_is_not_esbl(repo_root):
     # blaTEM-1 es la penicilinasa clasica de espectro estrecho, no una BLEE.
-    # Este es el caso central que el documento pide no asumir mal.
+    # Este es el caso central que no se debe clasificar mal.
     targets = load_real_resistance_targets(repo_root)
     result = classify_beta_lactamase("blaTEM-1", "BETA-LACTAM", targets)
     assert result != "ESBL"

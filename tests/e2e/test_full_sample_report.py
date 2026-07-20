@@ -1,5 +1,5 @@
 """Prueba de extremo a extremo: de los resultados de cada modulo hasta el
-reporte HTML final de una muestra (seccion 22 del diseno del pipeline).
+reporte HTML final de una muestra.
 
 Alcance: procesa una muestra conocida y sintetica a traves de TODA la
 cadena de scripts de este pipeline en Python (parseo -> clasificacion ->

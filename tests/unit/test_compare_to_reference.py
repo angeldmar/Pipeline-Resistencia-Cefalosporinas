@@ -24,12 +24,13 @@ from compare_to_reference import (
         (True, False, "FN"),
     ],
 )
-def test_confusion_category_matches_design_document_function(reference_positive, pipeline_positive, expected):
+def test_confusion_category_matches_expected_classification(reference_positive, pipeline_positive, expected):
     assert confusion_category(reference_positive, pipeline_positive) == expected
 
 
 def test_confusion_category_indeterminate_when_reference_is_none():
-    # Quinta categoria (mas alla del ejemplo del documento): sin estandar de
+    # Quinta categoria (mas alla de las cuatro habituales de una matriz de
+    # confusion): sin estandar de
     # referencia documentado, no se puede clasificar como TP/TN/FP/FN.
     assert confusion_category(None, True) == "Indeterminado"
     assert confusion_category(None, False) == "Indeterminado"

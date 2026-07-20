@@ -6,9 +6,9 @@ comparacion con la referencia, desempeno, versiones de herramientas) en un
 unico reporte HTML autocontenido (la grafica va embebida en base64, no como
 archivo aparte).
 
-REGLA DE ALCANCE (seccion 19 del diseno del pipeline): el reporte describe
-determinantes GENOTIPICOS detectados, nunca una conclusion clinica. En vez
-de "Aislado resistente a ceftriaxona", el reporte dice algo como "Se detecto
+REGLA DE ALCANCE: el reporte describe determinantes GENOTIPICOS detectados,
+nunca una conclusion clinica. En vez de "Aislado resistente a ceftriaxona",
+el reporte dice algo como "Se detecto
 el determinante blaCTX-M-15, asociado con beta-lactamasas de espectro
 extendido (BLEE)...". Ver build_gene_interpretation_sentences().
 """

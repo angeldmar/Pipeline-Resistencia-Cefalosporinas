@@ -1,4 +1,4 @@
-"""Pruebas negativas (seccion 22 del diseno del pipeline).
+"""Pruebas negativas.
 
 Varios casos negativos individuales (identificador duplicado, fenotipo
 invalido, FASTQ/ensamblaje vacio, archivo corrupto) ya quedan cubiertos por

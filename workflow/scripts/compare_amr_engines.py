@@ -2,11 +2,11 @@
 (AMRFinderPlus y ABricate/CARD+ResFinder).
 
 Este es un pilar distinto de la comparacion contra el estandar de referencia
-fenotipico (compare_to_reference.py, seccion 14 del diseno original) y de la
-reproducibilidad entre corridas repetidas (assess_reproducibility.py): aqui se
-mide si DOS HERRAMIENTAS DE DETECCION INDEPENDIENTES, corridas sobre el MISMO
-ensamblaje, coinciden en que genes de resistencia encuentran. Una concordancia
-baja entre motores es una senal de alerta metodologica -- distinta de una
+fenotipico (compare_to_reference.py) y de la reproducibilidad entre corridas
+repetidas (assess_reproducibility.py): aqui se mide si DOS HERRAMIENTAS DE
+DETECCION INDEPENDIENTES, corridas sobre el MISMO ensamblaje, coinciden en
+que genes de resistencia encuentran. Una concordancia baja entre motores es
+una senal de alerta metodologica -- distinta de una
 discrepancia contra el fenotipo, que podria deberse a expresion genica, no a
 un error de deteccion.
 

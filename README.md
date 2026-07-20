@@ -190,8 +190,8 @@ bases Q20/Q30, % de contenido GC, % de duplicación). Tiene dos subcomandos:
   `results/tables/fastp_summary.tsv`.
 
 **Decisión de arquitectura:** en vez de que cada muestra escriba directamente
-sobre un único `fastp_summary.tsv` compartido (como sugiere literalmente la
-sección 6.3 del diseño), cada muestra escribe su propio archivo. Snakemake puede
+sobre un único `fastp_summary.tsv` compartido, cada muestra escribe su propio
+archivo. Snakemake puede
 ejecutar varias muestras en paralelo, y varios procesos escribiendo a la vez
 sobre el mismo archivo compartido causaría condiciones de carrera y resultados
 corruptos o incompletos. La tabla combinada se arma en un paso de agregación
@@ -213,22 +213,20 @@ necesario para calcularla (lecturas retenidas y bases totales tras el
 filtrado) — no hace falta ejecutar ninguna herramienta adicional.
 
 - `estimate_coverage(read_count, mean_read_length, genome_size)`: implementa
-  la fórmula `Cobertura = (lecturas × longitud media) / tamaño del genoma`,
-  tal como la define el diseño del pipeline. La longitud media de lectura se
-  calcula a partir de `total_bases / total_reads` (después del filtrado), en
-  vez de asumirse fija.
+  la fórmula `Cobertura = (lecturas × longitud media) / tamaño del genoma`.
+  La longitud media de lectura se calcula a partir de
+  `total_bases / total_reads` (después del filtrado), en vez de asumirse fija.
 - `classify_coverage(estimated_coverage, minimum_coverage, warning_coverage)`:
   clasifica la cobertura en `PASS` (≥30x), `WARNING` (15x–30x) o `FAIL` (<15x).
   Los umbrales 30x/15x están en `config.yaml`
-  (`quality.minimum_coverage` / `quality.warning_coverage`); la especificación
-  del pipeline solo definía el umbral PASS, así que el umbral WARNING (15x) se
-  fijó explícitamente antes de implementarlo.
+  (`quality.minimum_coverage` / `quality.warning_coverage`), incluido el
+  umbral WARNING (15x), definido explícitamente junto con el resto.
 - Ninguna muestra se descarta en silencio: `mean_read_length`,
   `estimated_coverage` y `coverage_status` quedan como columnas nuevas en la
   misma tabla por muestra (`results/tables/fastp/{sample_id}.tsv`), visibles
   también en el resumen combinado.
 
-Probado con la fórmula del propio ejemplo del diseño (2,000,000 lecturas × 150
+Probado con el caso de referencia (2,000,000 lecturas × 150
 pb / 5,000,000 pb = 60x) y con tres reportes JSON simulados que producen
 exactamente los tres estados (`PASS` a 60x, `WARNING` a 21x, `FAIL` a 9x).
 
@@ -298,8 +296,7 @@ tiene prioridad sobre WARNING.
 
 ### 12. Completitud y contaminación (CheckM)
 
-La especificación del pipeline dejaba la herramienta sin definir ("una
-herramienta específica"); se utiliza **CheckM**, el estándar de facto para
+Se utiliza **CheckM**, el estándar de facto para
 completitud/contaminación de genomas bacterianos vía genes marcadores de
 copia única específicos del linaje. Se agregaron dos reglas más a
 `workflow/rules/assembly.smk` (evalúa el mismo ensamblaje filtrado que QUAST):
@@ -314,17 +311,16 @@ estructura fija) sigue el mismo patrón de archivo-por-muestra +
 `combine`, con una diferencia importante: el subcomando `combine` no solo
 escribe `checkm_summary.tsv`, sino que además genera
 **`results/tables/checkm_exclusions.tsv`**, un registro aparte con únicamente
-las muestras `FAIL` y el motivo — tal como pide la sección 10 ("las muestras
-que fallen pueden excluirse del análisis principal, pero deben permanecer en
-el registro de exclusiones"). Ninguna muestra desaparece del resumen general.
+las muestras `FAIL` y el motivo: las muestras que fallan se excluyen del
+análisis principal, pero permanecen visibles en el registro de exclusiones.
+Ninguna muestra desaparece del resumen general.
 
 Clasificación: `PASS` solo si completitud ≥ `assembly.minimum_completeness`
 (95%) **y** contaminación < `assembly.maximum_contamination` (5%); cualquier
-otro caso es `FAIL` (el documento no pide un nivel `WARNING` intermedio aquí).
+otro caso es `FAIL` (sin un nivel `WARNING` intermedio en este criterio).
 
 Añadido también `workflow/envs/checkm.yaml` (placeholder, se completará en la
-parte de ambientes Conda) y `threads.checkm` en `config.yaml`, ya que CheckM
-tampoco estaba en la lista original de ambientes.
+parte de ambientes Conda) y `threads.checkm` en `config.yaml`.
 
 Probado con tres reportes CheckM sintéticos (formato `--tab_table` real):
 un caso PASS, un caso que falla solo por completitud baja, y un caso que
@@ -345,20 +341,19 @@ motivo sin que desaparezcan del resumen combinado.
 
 **`workflow/scripts/parse_kraken2.py`** (script nuevo) extrae: taxón
 predominante, % asignado a *E. coli*, y % de otras especies (contaminación),
-y clasifica con `classify_taxonomy()` — misma lógica del documento (PASS si
+y clasifica con `classify_taxonomy()` (PASS si
 ≥90% *E. coli* y <5% contaminantes; WARNING si ≥70% *E. coli*; FAIL en el
 resto), con los umbrales en `config.yaml` (`taxonomy.*`, ya centralizados
 desde la parte 4).
 
-**Regla de revisión manual para *Shigella*** (sección 11, requisito explícito
-del documento): *Shigella* es genómicamente tan cercana a *E. coli* que
-históricamente se consideraron la misma especie. Si Kraken2 asigna lecturas a
-*Shigella*, el script **no** las suma al porcentaje de "otras especies" que
-dispararía un FAIL — en vez de eso, marca `requires_manual_review=True` y deja
-un registro aparte (`results/tables/taxonomy_manual_review.tsv`) con esas
-muestras, para que un analista decida caso por caso. Esto implementa
-literalmente la instrucción del documento de no excluir automáticamente estos
-aislamientos sin revisión.
+**Regla de revisión manual para *Shigella*:** *Shigella* es genómicamente tan
+cercana a *E. coli* que históricamente se consideraron la misma especie. Si
+Kraken2 asigna lecturas a *Shigella*, el script **no** las suma al porcentaje
+de "otras especies" que dispararía un FAIL — en vez de eso, marca
+`requires_manual_review=True` y deja un registro aparte
+(`results/tables/taxonomy_manual_review.tsv`) con esas muestras, para que un
+analista decida caso por caso, en vez de excluirlas o aceptarlas
+automáticamente.
 
 Probado con tres reportes Kraken2 sintéticos (formato real, jerárquico):
 
@@ -385,12 +380,9 @@ supera ese umbral, configurable según qué tan sensible se quiera la alerta.
 
 ### 14. Anotación genómica (Prokka)
 
-Herramienta no especificada en la especificación del pipeline; se utiliza
-**Prokka** (estándar clásico, ampliamente citado, sin necesidad de descargar
-una base de datos de referencia grande, a diferencia de Bakta). Se creó
-**`workflow/rules/annotation.smk`** (archivo nuevo, no estaba en la lista fija
-de reglas — igual que ocurrió con algunos scripts en partes anteriores) con
-dos reglas:
+Se utiliza **Prokka** (estándar clásico, ampliamente citado, sin necesidad de
+descargar una base de datos de referencia grande, a diferencia de Bakta).
+Se creó **`workflow/rules/annotation.smk`** (archivo nuevo) con dos reglas:
 
 - `prokka`: anota el ensamblaje filtrado y produce `.gff`, `.gbk`, `.faa`,
   `.ffn`, además de `.tsv` y `.txt` (que Prokka genera igual, y que el
@@ -408,13 +400,12 @@ Prokka consultando `prokka --version` en tiempo de ejecución (si la
 herramienta no está disponible, registra `"unknown"` en vez de fallar, ya
 que es un dato de trazabilidad, no bloqueante).
 
-Se agregó `results/annotation/` a la estructura de resultados (no estaba en
-la lista original de subcarpetas de `results/`) y `threads.prokka` en
-`config.yaml`.
+Se agregó `results/annotation/` a la estructura de resultados y
+`threads.prokka` en `config.yaml`.
 
-Como nota el propio documento, este paso es informativo/complementario:
-AMRFinderPlus (parte 15) trabaja directamente sobre el ensamblaje de
-nucleótidos y no depende de esta anotación.
+Este paso es informativo/complementario: AMRFinderPlus (parte 15) trabaja
+directamente sobre el ensamblaje de nucleótidos y no depende de esta
+anotación.
 
 Probado con un resumen y una tabla de Prokka sintéticos (formato real):
 extrae correctamente CDS/rRNA/tRNA del resumen, cuenta bien 2 genes
@@ -434,8 +425,8 @@ instalado (versión `"unknown"`).
 
 **`workflow/scripts/parse_amrfinder.py`** convierte la tabla cruda de
 AMRFinderPlus a un esquema propio y estable (tabla **larga**: una fila por
-gen detectado, siguiendo la recomendación de la sección 15 de evitar
-combinar múltiples genes en columnas difíciles de analizar): símbolo del
+gen detectado, en vez de combinar múltiples genes en columnas difíciles de
+analizar): símbolo del
 gen, familia (derivada quitando el sufijo de alelo, ej. `blaCTX-M-15` →
 `blaCTX-M`), alelo, nombre descriptivo, clase/subclase de antimicrobiano,
 método de detección, % identidad, % cobertura, contig y coordenadas. Las
@@ -446,21 +437,20 @@ muestra no tiene genes detectados, se escribe igual un archivo (con
 encabezado, 0 filas) para distinguir "sin genes" de "no procesada".
 
 **`workflow/scripts/classify_cephalosporin_genes.py`**: implementa
-`classify_beta_lactamase()`, pero **generaliza** el ejemplo del documento en
-un punto importante — en vez de fijar las familias BLEE/AmpC en el código
-(duplicando lo que ya vive en `resistance_targets.yaml`), las **lee** de ese
-archivo. Esto además corrigió dos huecos del ejemplo original: (1) GES tiene
-el mismo problema que SHV/TEM (hay alelos GES que son carbapenemasas, no
-BLEE), así que cualquier familia marcada `-ESBL` en el YAML pasa por la
-misma verificación de subclase, no solo SHV y TEM explícitamente; (2) se
-agregó la categoría `Carbapenemase` (el ejemplo original no la contemplaba
-pese a que `resistance_targets.yaml` ya definía esa lista).
+`classify_beta_lactamase()` de forma **general** — en vez de fijar las
+familias BLEE/AmpC en el código (duplicando lo que ya vive en
+`resistance_targets.yaml`), las **lee** de ese archivo. Esto evita dos
+huecos: (1) GES tiene el mismo problema que SHV/TEM (hay alelos GES que son
+carbapenemasas, no BLEE), así que cualquier familia marcada `-ESBL` en el
+YAML pasa por la misma verificación de subclase, no solo SHV y TEM
+explícitamente; (2) se agregó la categoría `Carbapenemase`, ya definida en
+`resistance_targets.yaml`.
 
 Probado con AMRFinderPlus sintético cubriendo los casos clave:
 
 - `blaCTX-M-15` (subclase `CEPHALOSPORIN`) → **ESBL** — familia sin ambigüedad.
 - `blaTEM-1` y `blaSHV-1` (subclase `BETA-LACTAM`, no `EXTENDED-SPECTRUM`) →
-  **Other**, no ESBL — confirma la regla central de la sección 13.3: el
+  **Other**, no ESBL — confirma la regla central: el
   prefijo de familia por sí solo no basta.
 - `blaCMY-2` (subclase `CEPHALOSPORIN`) → **AmpC**.
 - `blaNDM-1` (subclase `CARBAPENEM`) → **Carbapenemase**.
@@ -474,8 +464,7 @@ Probado con AMRFinderPlus sintético cubriendo los casos clave:
 **`workflow/scripts/compare_to_reference.py`** (script nuevo) arma, por
 muestra, la matriz TP/TN/FP/FN que R usará después para calcular
 sensibilidad/especificidad/kappa — **ningún cálculo estadístico se hace
-aquí**, solo se prepara y clasifica la matriz de datos, tal como pide el
-documento. Compara `expected_genes` de `samples.tsv` contra los genes
+aquí**, solo se prepara y clasifica la matriz de datos. Compara `expected_genes` de `samples.tsv` contra los genes
 detectados con confianza (`meets_identity_coverage_threshold=True`) en
 `amr_summary.tsv`:
 
@@ -487,8 +476,8 @@ detectados con confianza (`meets_identity_coverage_threshold=True`) en
 - `expected_genes="none"` sin genes beta-lactámicos detectados → `TN`; si
   aparece alguno inesperado → `FP`.
 - Gen esperado no detectado → `FN`.
-- **`Indeterminado`** (quinta categoría que pide la sección 14, más allá del
-  ejemplo de `confusion_category()` del documento): cuando `expected_genes`
+- **`Indeterminado`** (quinta categoría, más allá de las cuatro habituales de
+  una matriz de confusión): cuando `expected_genes`
   está vacío o `NA` — es decir, no hay estándar de referencia documentado
   para esa muestra — en vez de forzar una comparación sin sentido.
 
@@ -560,8 +549,8 @@ no se pisen entre sí.
 
 **Columnas pendientes:** "Tiempo" y "Memoria" (medición de desempeño
 computacional) aún no existen como módulo — se agregan en la parte 18,
-siguiendo el orden recomendado del propio documento (primero la tabla
-maestra, después tiempo/RAM). `merge_results.py` se extenderá entonces.
+después de tener la tabla maestra en su lugar. `merge_results.py` se
+extenderá entonces.
 
 **Resiliencia:** si la tabla de resumen de algún módulo todavía no existe
 (corrida parcial durante el desarrollo), se avisa por stdout y se continúa
@@ -577,10 +566,11 @@ AMR y la comparación de referencia coinciden correctamente en cada fila.
 
 ### 18. Medición de desempeño computacional
 
-**Decisión de arquitectura:** el documento sugiere envolver cada comando con
-`/usr/bin/time -v` (GNU time). Esa variante `-v` es específica de GNU y no
-existe en macOS/BSD (el entorno de desarrollo de este proyecto), ni se puede
-asumir instalada en cualquier entorno de ejecución futuro. En su lugar se usó
+**Decisión de arquitectura:** envolver cada comando con `/usr/bin/time -v`
+(GNU time) fue la primera opción considerada, pero esa variante `-v` es
+específica de GNU y no existe en macOS/BSD (el entorno de desarrollo de este
+proyecto), ni se puede asumir instalada en cualquier entorno de ejecución
+futuro. En su lugar se usó
 el módulo `resource` de la biblioteca estándar de Python, que mide lo mismo
 (tiempo, CPU, RAM máxima) de forma portable entre Linux y macOS, siguiendo el
 mismo principio ya usado en todo el pipeline: Python orquesta las
@@ -645,13 +635,14 @@ la parte 17, confirmando que las nuevas columnas no alteran `final_status`.
 
 **`workflow/scripts/assess_reproducibility.py`** (script nuevo) compara
 corridas repetidas de la misma muestra (convención `{base}_run{n}`, ej.
-`EC001_run1`, `EC001_run2`, `EC001_run3`) por pares, usando exactamente las
-funciones `exact_gene_concordance()` y `jaccard_similarity()` del documento,
+`EC001_run1`, `EC001_run2`, `EC001_run3`) por pares, usando las
+funciones `exact_gene_concordance()` y `jaccard_similarity()`,
 más dos comparaciones categóricas adicionales:
 
 - **Genes y alelos**: concordancia exacta + Jaccard sobre el conjunto de
   genes confiables detectados (el símbolo de gen de AMRFinderPlus ya
-  codifica el alelo, así que esto cubre ambos requisitos del documento a la vez).
+  codifica el alelo, así que esto cubre gen y alelo a la vez con una sola
+  comparación).
 - **Archivo de ensamblaje final**: hash SHA-256 de `contigs.filtered.fasta`
   — idéntico o no entre corridas (SPAdes no es perfectamente determinista
   entre corridas por sus heurísticas multi-hilo, así que esta comparación
@@ -659,9 +650,9 @@ más dos comparaciones categóricas adicionales:
 - **Estado de clasificación**: coincidencia del `final_status` de la tabla
   maestra entre corridas.
 
-**Límite de arquitectura respetado a propósito:** el documento reserva el
-coeficiente de variación **exclusivamente para R** ("R se reservará
-únicamente para... Coeficiente de variación"). Por eso este script **no
+**Límite de arquitectura respetado a propósito:** el coeficiente de
+variación se calcula **exclusivamente en R** (parte 20), nunca en Python.
+Por eso este script **no
 calcula CV**, ni siquiera como medida secundaria de apoyo — solo usa
 comparaciones categóricas/exactas. Los datos numéricos crudos por corrida
 (cobertura, tiempo, RAM) ya quedan disponibles en `master_results.tsv` con
@@ -680,8 +671,8 @@ comparaciones por pares resultan correctas: 1 par totalmente concordante,
 
 **`workflow/scripts/prepare_validation_input.py`** (script nuevo, en Python)
 junta `reference_comparison.tsv` con `performance_by_sample.tsv` en
-`results/statistics/validation_input.csv`, con exactamente las columnas que
-pide el documento: `sample_id, reference_result, pipeline_result, run,
+`results/statistics/validation_input.csv`, con las columnas: `sample_id,
+reference_result, pipeline_result, run,
 elapsed_seconds, max_ram_gb`. Reutiliza la misma convención de corridas de
 reproducibilidad (`{base}_runN`) de la parte 19 para poblar la columna `run`
 correctamente; las muestras sin estándar de referencia
@@ -705,16 +696,15 @@ que no se resuelve automáticamente en todas las instalaciones). Calcula:
   dependencias extra) para esas dos.
 - **Índice kappa** (`irr::kappa2`) → `kappa.csv`.
 - **Coeficiente de variación** de tiempo de ejecución y RAM entre corridas
-  repetidas → `cv_execution_time.csv` y `cv_ram_usage.csv` (exactamente la
-  función `cv()` del documento, aplicada también a RAM por generalización
-  directa, no solo a tiempo).
+  repetidas → `cv_execution_time.csv` y `cv_ram_usage.csv` (una función
+  `cv()` aplicada tanto a tiempo como a RAM, por generalización
+  directa).
 - **Gráficas**: mapa de calor de la matriz de confusión y barras de CV de
   tiempo por muestra, en `results/statistics/plots/`.
 
 **Límite de arquitectura respetado:** todo el cálculo de CV vive
 exclusivamente aquí, en R — Python (partes 18 y 19) solo dejó los datos
-crudos por corrida listos, sin calcular ningún CV, tal como exige el
-documento ("R se reservará únicamente para... Coeficiente de variación").
+crudos por corrida listos, sin calcular ningún CV.
 
 Probado de extremo a extremo con datos sintéticos (7 filas: 3 corridas de
 reproducibilidad de una muestra + 4 muestras normales, con 1 TP/TN/FP/FN de
@@ -762,8 +752,8 @@ imagen en base64, sin archivos `.png` sueltos.
 **Regla de alcance respetada literalmente (la más importante de esta
 parte):** `build_gene_interpretation_sentences()` nunca genera una
 conclusión clínica tipo "Aislado resistente a ceftriaxona". Para cada gen
-detectado con confianza, construye una oración con el patrón exacto que pide
-el documento: *"Se detectó el determinante blaCTX-M-15, asociado con
+detectado con confianza, construye una oración genotípica descriptiva:
+*"Se detectó el determinante blaCTX-M-15, asociado con
 beta-lactamasas de espectro extendido (BLEE)..."* — usando la categoría
 mecanística ya calculada en la parte 15 (`beta_lactamase_category`), así que
 `blaTEM-1` (clasificado como `Other`, no `ESBL`) recibe una interpretación
@@ -798,9 +788,9 @@ pendientes desde las partes 8 a 15 porque necesitaban `SAMPLES` — se
 agregaron a sus archivos `.smk` correspondientes, cada una con
 `expand(..., sample=SAMPLES)` sobre la tabla individual de cada muestra.
 
-**Orden correcto de `configfile`/`include`/`SAMPLES`.** El ejemplo del
-documento (sección 20) ordena `include:` de las reglas *antes* de definir
-`SAMPLES`. Eso no funciona en este pipeline: las reglas `combine_*` nuevas
+**Orden correcto de `configfile`/`include`/`SAMPLES`.** Definir `SAMPLES`
+antes de los `include:` de las reglas es necesario en este pipeline: las
+reglas `combine_*` nuevas
 usan `expand(..., sample=SAMPLES)` directamente en su `input:`, así que
 `SAMPLES` debe existir *antes* de que Snakemake evalúe esos archivos. El
 `Snakefile` reordena esto: `configfile` → validar muestras y construir
@@ -909,9 +899,7 @@ CONDA_SUBDIR=osx-64 snakemake --use-conda --cores 8 --rerun-incomplete --printsh
 
 Esto aplica la emulación a *todos* los ambientes por simplicidad (incluidos
 los que sí tienen build nativo arm64, con un costo menor de rendimiento en
-esos casos). La alternativa real para producción — y la más alineada con
-cómo se plantea usar este pipeline en la práctica (sección 23 del diseño:
-"Ejecutar el conjunto independiente de evaluación") — es correr el pipeline
+esos casos). La alternativa real para producción es correr el pipeline
 en Linux (contenedor, VM, o un clúster/HPC), donde bioconda tiene
 compilaciones completas para las tres herramientas sin necesidad de emulación.
 
@@ -933,13 +921,14 @@ ningún test dependa del directorio desde el que se invoque `pytest`. Se
 agregó `pytest.ini` (`testpaths = tests`) para que `pytest` sin argumentos,
 corrido desde la raíz, descubra todo automáticamente.
 
-**106 pruebas, en los 4 niveles que pide la sección 22**, todas reutilizando
-los mismos casos que ya se habían validado manualmente a lo largo de las 23
+**106 pruebas, en 4 niveles (unitarias, integración, extremo a extremo,
+negativas)**, todas reutilizando
+los mismos casos que ya se habían validado manualmente a lo largo de las
 partes anteriores, ahora formalizados con `assert`:
 
 - **Unitarias** (`tests/unit/`, ~96 pruebas): una por script con lógica de
   clasificación — `validate_samples`, `parse_fastp` (incluida la fórmula
-  exacta de cobertura del documento), `parse_quast` (incluida la prioridad
+  exacta de cobertura), `parse_quast` (incluida la prioridad
   de FAIL sobre WARNING), `parse_checkm`, `parse_kraken2` (incluido el caso
   Shigella), `filter_contigs`, `classify_cephalosporin_genes` (el caso
   crítico TEM/SHV no-BLEE), `compare_to_reference` (incluida la regresión
@@ -982,11 +971,10 @@ fixtures de prueba también pueden tener bugs, no solo el código bajo prueba.
 
 Ejecutar toda la suite: `pytest` (desde la raíz del repositorio).
 
-## Extensiones más allá del diseño original
+## Extensiones adicionales
 
-Tras completar las 24 partes del documento de diseño, se identificaron y
-priorizaron algunas extensiones adicionales, no contempladas en el
-documento original de 23 secciones:
+Tras completar las 24 partes iniciales del pipeline, se identificaron y
+priorizaron algunas extensiones adicionales:
 
 | # | Parte | Estado |
 |---|-------|--------|
@@ -1362,9 +1350,9 @@ corrido el pipeline a mano primero.
 
 ## Estado del roadmap
 
-Las 24 partes del diseño del pipeline están completas, más las extensiones
-25–28. La ejecución real sobre datos biológicos reales (pasos 18–22 de la
-sección 23 del documento original) ya se hizo: ambientes Conda instalados
+Las 24 partes iniciales del pipeline están completas, más las extensiones
+25–28. La ejecución real sobre datos biológicos reales ya se hizo:
+ambientes Conda instalados
 de verdad (`CONDA_SUBDIR=osx-64`), bases de datos de referencia
 descargadas (AMRFinderPlus, CheckM, Kraken2), y el pipeline completo
 corrido dos veces sobre una muestra pública real de *E. coli* (`ERR17582235`,

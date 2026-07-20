@@ -10,13 +10,13 @@ from assess_reproducibility import (
 )
 
 
-def test_exact_gene_concordance_matches_design_document_function():
+def test_exact_gene_concordance_matches_expected_behavior():
     assert exact_gene_concordance({"blaCTX-M-15"}, {"blaCTX-M-15"}) == 1.0
     assert exact_gene_concordance({"blaCTX-M-15"}, {"blaCTX-M-27"}) == 0.0
     assert exact_gene_concordance(set(), set()) == 1.0
 
 
-def test_jaccard_similarity_matches_design_document_function():
+def test_jaccard_similarity_matches_expected_behavior():
     assert jaccard_similarity(set(), set()) == 1.0
     assert jaccard_similarity({"a", "b"}, {"a", "b", "c"}) == pytest.approx(2 / 3)
     assert jaccard_similarity({"a"}, {"b"}) == 0.0

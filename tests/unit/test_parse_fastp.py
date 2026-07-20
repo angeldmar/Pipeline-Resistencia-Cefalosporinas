@@ -5,8 +5,8 @@ import pytest
 from parse_fastp import classify_coverage, estimate_coverage, extract_fastp_metrics
 
 
-def test_estimate_coverage_matches_design_document_example():
-    # Ejemplo exacto de la seccion 7 del diseno del pipeline: 2,000,000
+def test_estimate_coverage_matches_reference_example():
+    # Caso de referencia: 2,000,000
     # lecturas x 150 pb / 5,000,000 pb de genoma = 60x.
     result = estimate_coverage(read_count=2_000_000, mean_read_length=150, genome_size=5_000_000)
     assert result == 60
