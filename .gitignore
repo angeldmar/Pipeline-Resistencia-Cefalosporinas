@@ -51,9 +51,16 @@ logs/*
 webapp/runs/*
 !webapp/runs/.gitkeep
 
-# Seccion de validacion estadistica: muestras reales y resultados que se
-# aportaran para ese analisis, mismo criterio que data/ y results/.
-validacion_estadistica/muestras/*
-!validacion_estadistica/muestras/.gitkeep
+# Seccion de validacion estadistica.
+# Las muestras reales descargadas SI se versionan (a diferencia de data/raw/
+# en la herramienta operativa): son un conjunto curado y acotado para esta
+# validacion, no un lote reproducible bajo demanda. Solo se ignora el Excel
+# de accesiones de entrada (dato de entrada, no parte del conjunto validado).
+validacion_estadistica/muestras/*.xlsx
+validacion_estadistica/muestras/*.xls
+
+# Resultados del pipeline sobre esas muestras: si se pueden regenerar
+# corriendo el pipeline sobre las muestras ya versionadas, mismo criterio
+# que results/ en la herramienta operativa.
 validacion_estadistica/resultados/*
 !validacion_estadistica/resultados/.gitkeep
