@@ -1377,6 +1377,36 @@ defecto para no saturar la vista principal. También se agregó una nota
 sobre qué significa un valor `N/D` (módulo que no corrió para este modo de
 análisis, no un error).
 
+### 30. Corrección de "Versiones de herramientas" (siempre mostraba "not installed")
+
+Encontrado revisando un reporte real: la sección de versiones de
+herramientas mostraba `not installed` para todo, incluido `snakemake`
+(irónico, dado que Snakemake es quien orquesta la corrida que produjo ese
+mismo reporte). Causa raíz: `capture_tool_versions.py` llama a cada
+herramienta por nombre suelto, pero la regla que lo invoca solo activa
+`workflow/envs/python.yaml` — un ambiente genérico que nunca tiene
+instaladas fastp, spades, quast, etc. (cada una vive en su propio ambiente
+Conda por regla). El script no podía encontrarlas sin importar si de
+verdad estaban instaladas en algún lado.
+
+Corregido resolviendo cada herramienta contra su propio ambiente ya creado
+(`resolve_conda_env_bin()`, mismo patrón que `webapp/pipeline_runner.py` y
+la regla `checkm`). Dos casos especiales:
+
+- **`snakemake`** no vive en un ambiente por-regla (es quien orquesta
+  todo), así que se consulta importando el paquete directamente en vez de
+  por subprocess — la regla ahora invoca el script con `{sys.executable}`
+  (el intérprete que lanzó Snakemake) en vez de con `"python"`, para que
+  ese import funcione.
+- **`checkm`** no soporta `--version` (no es un subcomando válido, solo
+  imprime un mensaje de uso); su versión real solo aparece en el
+  encabezado de `checkm -h`, así que se extrae de ahí con una expresión
+  regular.
+
+`prokka` sigue mostrando `not installed` correctamente — su ambiente nunca
+se creó a propósito (parte 14, queda fuera del objetivo por defecto del
+pipeline).
+
 ## Estado del roadmap
 
 Las 24 partes iniciales del pipeline están completas, más las extensiones

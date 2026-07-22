@@ -96,6 +96,13 @@ rule capture_tool_versions:
     # Registra, UNA sola vez por corrida (no por muestra: la version de una
     # herramienta no cambia entre muestras), las versiones instaladas de
     # cada herramienta externa del pipeline.
+    #
+    # {sys.executable} en vez de "python": cada herramienta vive en su
+    # propio ambiente Conda (resuelto dentro del script, ver
+    # capture_tool_versions.py), pero "snakemake" se consulta importando el
+    # paquete directamente -- eso requiere el interprete que lanzo
+    # Snakemake, no el "python" generico del ambiente activado para esta
+    # regla (mismo patron que la regla checkm en assembly.smk).
     output:
         "data/metadata/tool_versions.tsv",
     log:
@@ -104,7 +111,7 @@ rule capture_tool_versions:
         "../envs/python.yaml"
     shell:
         """
-        python workflow/scripts/capture_tool_versions.py --output {output} > {log} 2>&1
+        {sys.executable} workflow/scripts/capture_tool_versions.py --output {output} > {log} 2>&1
         """
 
 
