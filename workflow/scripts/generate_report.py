@@ -143,6 +143,23 @@ def collect_warnings(master_row: dict, amr_genes: list[dict]) -> list[str]:
             "cercanía genómica entre Shigella y E. coli."
         )
 
+    taxonomy_status = master_row.get("taxonomy_status")
+    ecoli_percentage = master_row.get("ecoli_percentage")
+    family_percentage = master_row.get("family_percentage")
+    if (
+        taxonomy_status in ("WARNING", "FAIL")
+        and isinstance(ecoli_percentage, (int, float)) and isinstance(family_percentage, (int, float))
+        and family_percentage - ecoli_percentage >= 10
+    ):
+        warnings.append(
+            f"El estado de identificación taxonómica es {taxonomy_status} por bajo % a nivel de "
+            f"especie ({ecoli_percentage}%), pero el % a nivel de familia Enterobacteriaceae es "
+            f"considerablemente más alto ({family_percentage}%). Esto sugiere una posible "
+            "limitación de resolución de la base de datos de Kraken2 (frecuente en E. coli, con "
+            "muchos genomas de referencia muy similares entre sí), no necesariamente una mezcla "
+            "real de especies -- revisar también other_contaminant_percentage antes de concluir."
+        )
+
     low_confidence_genes = [
         gene["gene_symbol"] for gene in amr_genes if not gene.get("meets_identity_coverage_threshold")
     ]

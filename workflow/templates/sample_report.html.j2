@@ -22,6 +22,11 @@
   .download-link { display: inline-block; margin: 0.3rem 0.6rem 0.3rem 0; padding: 0.4rem 0.8rem;
     background-color: #2c5f8a; color: white; text-decoration: none; border-radius: 4px; font-size: 0.88rem; }
   .download-link:hover { background-color: #1e4666; }
+  details.explain-box { margin: 0.5rem 0 1rem 0; font-size: 0.9rem; }
+  details.explain-box summary { cursor: pointer; color: #2c5f8a; font-weight: 600; }
+  details.explain-box summary:hover { text-decoration: underline; }
+  details.explain-box div { background-color: #f7f9fb; border-left: 4px solid #2c5f8a;
+    padding: 0.6rem 0.9rem; margin-top: 0.4rem; }
 </style>
 </head>
 <body>
@@ -43,6 +48,18 @@
   bioinformático de investigación. No constituye un diagnóstico clínico ni debe usarse para
   decisiones de tratamiento sin validación adicional independiente.
 </div>
+
+<details class="explain-box">
+  <summary>¿Cómo leer este reporte?</summary>
+  <div>
+    Cada sección tiene su propio desplegable "¿Qué significa esto?" con la interpretación de sus
+    resultados. Un valor <strong>N/D</strong> (no disponible) indica que ese módulo no corrió para
+    este análisis en particular — por ejemplo, al subir directamente un ensamblaje ya armado
+    (FASTA) en vez de lecturas crudas, no hay control de calidad de lecturas ni identificación
+    taxonómica que correr — no es un error del pipeline, es información que simplemente no aplica
+    a este modo de análisis.
+  </div>
+</details>
 
 <h2>Identificador y accesiones</h2>
 <table>
@@ -68,6 +85,16 @@
   <tr><th>Cobertura estimada</th><td>{{ estimated_coverage }}x</td></tr>
   <tr><th>Estado</th><td class="status-{{ coverage_status }}">{{ coverage_status }}</td></tr>
 </table>
+<details class="explain-box">
+  <summary>¿Qué significa esto?</summary>
+  <div>
+    La cobertura estima cuántas veces, en promedio, se secuenció cada posición del genoma.
+    <strong>PASS</strong> (≥30x) indica profundidad suficiente para un ensamblaje confiable;
+    <strong>WARNING</strong> (15x–30x) puede producir un ensamblaje más fragmentado; <strong>FAIL</strong>
+    (&lt;15x) suele indicar datos insuficientes para conclusiones confiables — no necesariamente un
+    problema con la muestra en sí, sino con la cantidad de secuenciación disponible.
+  </div>
+</details>
 
 <h2>Ensamblaje (SPAdes / QUAST)</h2>
 <table>
@@ -78,6 +105,16 @@
   <tr><th>Contenido GC (ensamblaje)</th><td>{{ assembly_gc_content_percent }}%</td></tr>
   <tr><th>Estado</th><td class="status-{{ assembly_status }}">{{ assembly_status }}</td></tr>
 </table>
+<details class="explain-box">
+  <summary>¿Qué significa esto?</summary>
+  <div>
+    Evalúa en cuántos fragmentos (contigs) quedó el genoma ensamblado y qué tan largo es un
+    fragmento representativo (N50: la mitad del genoma está en contigs de este tamaño o más largos).
+    Un ensamblaje muy fragmentado (muchos contigs, N50 bajo) puede dividir un gen entre dos
+    fragmentos y dificultar su detección, incluso si la muestra en sí es de buena calidad — suele
+    estar relacionado con baja cobertura o un genoma con muchas regiones repetitivas.
+  </div>
+</details>
 
 <h2>Completitud y contaminación (CheckM)</h2>
 <table>
@@ -85,15 +122,42 @@
   <tr><th>Contaminación</th><td>{{ contamination_percent }}%</td></tr>
   <tr><th>Estado</th><td class="status-{{ completeness_status }}">{{ completeness_status }}</td></tr>
 </table>
+<details class="explain-box">
+  <summary>¿Qué significa esto?</summary>
+  <div>
+    Completitud mide cuántos de los genes marcadores de copia única esperados en cualquier genoma
+    de este linaje bacteriano realmente se encontraron; contaminación mide cuántos aparecen
+    duplicados de forma sospechosa (señal de que el ensamblaje mezcla más de un organismo).
+    <strong>PASS</strong> requiere completitud alta (≥95%) <em>y</em> contaminación baja (&lt;5%) a
+    la vez — este resultado es independiente de la identificación taxonómica por lecturas
+    (Kraken2, más abajo), así que sirve como una segunda confirmación de que el ensamblaje
+    corresponde a un genoma bacteriano limpio, aunque Kraken2 no llegue a resolver la especie.
+  </div>
+</details>
 
 <h2>Identificación taxonómica (Kraken2)</h2>
 <table>
   <tr><th>Taxón predominante</th><td><em>{{ predominant_taxon }}</em></td></tr>
-  <tr><th>% asignado a E. coli</th><td>{{ ecoli_percentage }}%</td></tr>
+  <tr><th>% a nivel de especie (E. coli)</th><td>{{ ecoli_percentage }}%</td></tr>
+  <tr><th>% a nivel de familia (Enterobacteriaceae)</th><td>{{ family_percentage }}%</td></tr>
   <tr><th>% Shigella (revisión manual aparte)</th><td>{{ shigella_percentage }}%</td></tr>
   <tr><th>% otros contaminantes</th><td>{{ other_contaminant_percentage }}%</td></tr>
   <tr><th>Estado</th><td class="status-{{ taxonomy_status }}">{{ taxonomy_status }}</td></tr>
 </table>
+<details class="explain-box">
+  <summary>¿Qué significa esto?</summary>
+  <div>
+    El % a nivel de especie es la fracción de lecturas que Kraken2 resolvió exactamente hasta
+    <em>E. coli</em>; el % a nivel de familia incluye además las lecturas que solo llegaron hasta
+    Enterobacteriaceae (el grupo que también incluye <em>Shigella</em>, <em>Klebsiella</em>,
+    <em>Citrobacter</em>, etc.), sin bajar más. Si el % de familia es notablemente más alto que el
+    de especie, es probable que la base de datos de Kraken2 no tenga suficiente resolución para
+    esta muestra en particular — frecuente en <em>E. coli</em>, por la enorme cantidad de genomas
+    de referencia muy parecidos entre sí en las bases públicas — y no necesariamente una mezcla
+    real de especies. Eso último sería más probable si el % de otros contaminantes (distinto de
+    Shigella) también es alto.
+  </div>
+</details>
 
 <h2>Tipificación de secuencia multilocus (MLST)</h2>
 <p>Contexto epidemiológico del aislamiento (linaje/secuencia tipo), independiente de los
@@ -131,6 +195,16 @@ linaje frente a eventos de adquisición independientes del mismo gen de resisten
 {% else %}
 <p>No se detectaron genes de resistencia con confianza suficiente en esta muestra.</p>
 {% endif %}
+<details class="explain-box">
+  <summary>¿Qué significa esto?</summary>
+  <div>
+    Cada gen se marca <strong>confiable</strong> solo si su % de identidad y % de cobertura superan
+    los umbrales configurados; los que no los superan igual se muestran (para no ocultar
+    información), pero no se interpretan como hallazgo real más abajo. La <strong>ausencia</strong>
+    de genes detectados no garantiza susceptibilidad fenotípica: este pipeline reporta genotipo
+    (qué genes están presentes en el ensamblaje), no un resultado clínico de laboratorio.
+  </div>
+</details>
 
 <h2>Interpretación del mecanismo</h2>
 <p>Los siguientes enunciados describen determinantes genéticos detectados y su categoría
@@ -165,8 +239,25 @@ discrepancia contra el estándar de referencia fenotípico.</p>
   <tr><th>Concordancia exacta</th><td>{{ "Sí" if engine_exact_concordance == 1.0 else "No" }}</td></tr>
   <tr><th>Similitud de Jaccard</th><td>{{ engine_jaccard_similarity }}</td></tr>
 </table>
+<details class="explain-box">
+  <summary>¿Qué significa esto?</summary>
+  <div>
+    AMRFinderPlus y ABricate/CARD tienen un alcance distinto: AMRFinderPlus se enfoca en genes de
+    resistencia adquirida ya caracterizados, mientras que CARD (la base que usa ABricate aquí)
+    también incluye genes intrínsecos y regulatorios (bombas de eflujo, reguladores) presentes en
+    casi cualquier <em>E. coli</em>. Por eso una similitud de Jaccard baja no indica necesariamente
+    un error de alguno de los dos motores — puede reflejar simplemente que ABricate reporta más
+    genes de contexto genómico, no que discrepen en los genes de resistencia adquirida relevantes
+    para este pipeline. La <strong>concordancia exacta</strong> (arriba) compara el conjunto
+    completo de familias detectadas por ambos motores, por eso rara vez es "Sí" dado ese alcance
+    distinto.
+  </div>
+</details>
 
 <h2>Advertencias</h2>
+<p>Resume, en lenguaje llano, cualquier estado WARNING/FAIL de los módulos anteriores y otras
+señales que ameritan atención antes de interpretar el resultado — no implica necesariamente un
+error del pipeline, y cada advertencia explica su causa probable.</p>
 {% if warnings %}
 {% for warning in warnings %}
 <div class="warning-box">{{ warning }}</div>

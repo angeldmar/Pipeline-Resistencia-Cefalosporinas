@@ -1348,6 +1348,35 @@ concordancia Jaccard entre motores (0.0208) — confirmando que el camino de
 la interfaz web es reproducible y no depende de nada específico de haber
 corrido el pipeline a mano primero.
 
+### 29. Desglose de taxonomía por nivel y explicaciones desplegables en el reporte
+
+Dos refinamientos al reporte HTML, motivados directamente por la corrida con
+datos reales (sección 28): un valor bajo de `taxonomy_status` no siempre
+significa lo que parece, y el reporte no explicaba por sí solo el porqué de
+cada resultado.
+
+**`family_percentage`:** además de `ecoli_percentage` (% de lecturas
+resuelto exactamente hasta especie), `parse_kraken2.py` ahora también
+extrae el % acumulado a nivel de familia (Enterobacteriaceae). Se probó
+primero con nivel de género (Escherichia) como indicador intermedio, pero
+en la práctica, con la muestra real `ERR17582235`, casi ninguna lectura se
+detiene justo en género — la gran mayoría se detiene en familia (90–96%
+según la base de datos de Kraken2 usada). Un `family_percentage` alto junto
+a un `ecoli_percentage` bajo es una limitación de resolución de la base de
+datos, no necesariamente una mezcla real de especies; `collect_warnings()`
+en `generate_report.py` detecta este patrón automáticamente (diferencia
+≥10 puntos porcentuales) y lo explica en el reporte en vez de solo mostrar
+`FAIL`.
+
+**Cajas desplegables "¿Qué significa esto?":** cada sección con un estado
+PASS/WARNING/FAIL (cobertura, ensamblaje, completitud/contaminación,
+taxonomía, genes de resistencia, concordancia entre motores) tiene ahora un
+`<details>` HTML nativo (sin JavaScript, consistente con el reporte
+autocontenido) con la interpretación de esa sección, colapsado por
+defecto para no saturar la vista principal. También se agregó una nota
+sobre qué significa un valor `N/D` (módulo que no corrió para este modo de
+análisis, no un error).
+
 ## Estado del roadmap
 
 Las 24 partes iniciales del pipeline están completas, más las extensiones

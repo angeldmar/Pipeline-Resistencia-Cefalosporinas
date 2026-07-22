@@ -5,7 +5,23 @@ produce un reporte jerarquico (una fila por taxon, con el porcentaje de
 lecturas asignadas a el y a su descendencia). Este script reduce ese reporte
 a lo que el pipeline necesita para confirmar que una muestra es realmente
 Escherichia coli: el taxon predominante, el % de lecturas asignado a E. coli,
-y el % asignado a otras especies (posible contaminacion).
+el % asignado a la familia Enterobacteriaceae en conjunto, y el % asignado a
+otras especies (posible contaminacion).
+
+NOTA SOBRE RESOLUCION DE ESPECIE: con bases de datos Kraken2 mas chicas
+(recortadas por tamano), es comun que una fraccion importante de lecturas de
+una muestra genuinamente E. coli no resuelva mas alla de familia
+(Enterobacteriaceae), sin bajar a genero ni especie -- por la enorme
+cantidad de genomas de referencia muy cercanos entre si dentro de esta
+familia en las bases publicas (E. coli, Shigella, Citrobacter comparten
+muchos k-mers), no por un problema con la muestra en si. Se probo primero
+con el nivel de genero (Escherichia) como indicador intermedio, pero en la
+practica (dato real: ERR17582235) casi nada de lo no resuelto se detiene
+justo en genero -- la gran mayoria se detiene en familia. Por eso se
+reporta family_percentage en vez de un nivel de genero: family_percentage
+alto junto a un ecoli_percentage bajo es una limitacion de resolucion de la
+base de datos, distinta de una mezcla real de especies (que se veria como
+other_contaminant_percentage alto).
 
 REGLA DE REVISION MANUAL (no automatizar la exclusion): Shigella es tan
 proxima genomicamente a E. coli que ambos generos historicamente se
@@ -52,16 +68,19 @@ KRAKEN2_REPORT_COLUMNS = [
     "name",
 ]
 
-# Codigo de rango taxonomico que identifica una fila a nivel de especie.
+# Codigos de rango taxonomico que identifican una fila a nivel de especie/familia.
 SPECIES_RANK_CODE = "S"
+FAMILY_RANK_CODE = "F"
 
 TARGET_SPECIES_NAME = "Escherichia coli"
+TARGET_FAMILY_NAME = "Enterobacteriaceae"
 CLOSE_RELATIVE_GENUS_NAME = "Shigella"
 
 TAXONOMY_SUMMARY_COLUMNS = [
     "sample_id",
     "predominant_taxon",
     "ecoli_percentage",
+    "family_percentage",
     "shigella_percentage",
     "other_contaminant_percentage",
     "requires_manual_review",
@@ -114,6 +133,16 @@ def extract_taxonomy_metrics(
     ecoli_rows = species_level_rows.loc[species_level_rows["name"] == TARGET_SPECIES_NAME]
     ecoli_percentage = float(ecoli_rows["percentage"].iloc[0]) if not ecoli_rows.empty else 0.0
 
+    # Porcentaje acumulado a nivel de familia (incluye E. coli mas cualquier
+    # lectura que no resolvio mas alla de Enterobacteriaceae). Se reporta
+    # aparte de ecoli_percentage para poder distinguir "esto no es E. coli"
+    # de "esto es Enterobacteriaceae, pero la base de datos no resuelve
+    # hasta especie" (ver nota del modulo).
+    family_rows = kraken2_report.loc[
+        (kraken2_report["rank_code"] == FAMILY_RANK_CODE) & (kraken2_report["name"] == TARGET_FAMILY_NAME)
+    ]
+    family_percentage = float(family_rows["percentage"].iloc[0]) if not family_rows.empty else 0.0
+
     shigella_rows = species_level_rows.loc[
         species_level_rows["name"].str.startswith(CLOSE_RELATIVE_GENUS_NAME)
     ]
@@ -146,6 +175,7 @@ def extract_taxonomy_metrics(
         "sample_id": sample_id,
         "predominant_taxon": predominant_taxon,
         "ecoli_percentage": ecoli_percentage,
+        "family_percentage": family_percentage,
         "shigella_percentage": shigella_percentage,
         "other_contaminant_percentage": other_contaminant_percentage,
         "requires_manual_review": requires_manual_review,

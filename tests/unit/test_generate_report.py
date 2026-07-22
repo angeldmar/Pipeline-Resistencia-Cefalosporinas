@@ -41,3 +41,33 @@ def test_collect_warnings_flags_low_confidence_detections():
     warnings = collect_warnings(master_row, amr_genes)
 
     assert any("aac(3)-IId" in warning for warning in warnings)
+
+
+def test_collect_warnings_explains_low_species_high_family_pattern():
+    # Encontrado con datos reales (ERR17582235): taxonomy_status en WARNING/
+    # FAIL por bajo % de especie, con un % de familia Enterobacteriaceae
+    # bastante mas alto, sugiere limitacion de resolucion de la base de
+    # datos, no una mezcla real de especies -- el reporte debe explicar
+    # esto, no solo mostrar FAIL.
+    master_row = {
+        "final_status": "PASS", "taxonomy_status": "FAIL",
+        "ecoli_percentage": 4.71, "family_percentage": 90.52,
+    }
+
+    warnings = collect_warnings(master_row, [])
+
+    assert any("limitación de resolución" in warning for warning in warnings)
+
+
+def test_collect_warnings_does_not_explain_pattern_when_gap_is_small():
+    # Si el % de familia no es notablemente mas alto que el de especie, no
+    # aplica la explicacion de resolucion de base de datos (la diferencia
+    # es solo ruido normal, no un patron a destacar).
+    master_row = {
+        "final_status": "PASS", "taxonomy_status": "WARNING",
+        "ecoli_percentage": 80.0, "family_percentage": 82.0,
+    }
+
+    warnings = collect_warnings(master_row, [])
+
+    assert not any("limitación de resolución" in warning for warning in warnings)

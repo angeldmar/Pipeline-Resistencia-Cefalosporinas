@@ -86,6 +86,34 @@ def test_shigella_review_threshold_is_configurable():
     assert strict_metrics["requires_manual_review"] is False
 
 
+def test_family_percentage_captures_unresolved_species_reads():
+    # Encontrado con datos reales (ERR17582235, base Kraken2 recortada por
+    # tamano): solo el 4.71% de las lecturas resolvio hasta especie, pero el
+    # 90.52% resolvio al menos hasta familia Enterobacteriaceae (incluye el
+    # 4.71% de especie mas lecturas que no bajaron mas alla de familia).
+    # family_percentage debe capturar ese acumulado por separado de
+    # ecoli_percentage -- se probo primero con nivel de genero, pero en la
+    # practica casi nada se detiene justo ahi (ver docstring del modulo).
+    report = build_kraken2_report([
+        (90.52, "F", "Enterobacteriaceae"),
+        (5.47, "G", "Escherichia"),
+        (4.71, "S", "Escherichia coli"),
+    ])
+
+    metrics = extract_taxonomy_metrics("EC_FAMILY_ONLY", report, **DEFAULT_THRESHOLDS)
+
+    assert metrics["ecoli_percentage"] == 4.71
+    assert metrics["family_percentage"] == 90.52
+
+
+def test_family_percentage_defaults_to_zero_without_family_level_row():
+    report = build_kraken2_report([(95.0, "S", "Escherichia coli")])
+
+    metrics = extract_taxonomy_metrics("EC_NO_FAMILY_ROW", report, **DEFAULT_THRESHOLDS)
+
+    assert metrics["family_percentage"] == 0.0
+
+
 def test_predominant_taxon_is_not_assumed_to_be_ecoli():
     report = build_kraken2_report([
         (40.0, "S", "Escherichia coli"),
