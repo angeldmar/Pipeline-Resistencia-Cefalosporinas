@@ -60,16 +60,17 @@ con la versión de AMRFinderPlus de este proyecto ocurre naturalmente al
 correr el pipeline sobre ellas — que es, de hecho, el propósito de esta
 validación.
 
-**Pipeline corrido y notebook completo.** `run_validation_batch.py` procesó
-las 92 muestras (modo solo-ensamblaje: QUAST, CheckM, AMRFinderPlus,
+**Pipeline corrido, notebook completo y ejecutado.** `run_validation_batch.py`
+procesó las 92 muestras (modo solo-ensamblaje: QUAST, CheckM, AMRFinderPlus,
 ABricate, MLST, comparación contra el estándar de referencia).
 `prepare_statistics_input.py` junta esos resultados por muestra en
 `resultados/tables/validation_summary.tsv`, y
-`notebooks/validacion_estadistica.ipynb` (R vía IRkernel) calcula sobre esa
-tabla sensibilidad, especificidad, exactitud (con IC 95%), kappa de Cohen,
-y desglosa los casos discordantes uno por uno con su explicación más
-probable — ver la sección "Discusión" del notebook para el detalle
-completo, incluida la limitación pendiente del coeficiente de variación de
-tiempo/RAM (las 5 muestras marcadas como control de reproducibilidad
-todavía se corren una sola vez, no las 3 corridas independientes previstas
+`notebooks/validacion_estadistica.ipynb` (R vía IRkernel, ambiente
+`workflow/envs/r_statistics.yaml`) calcula sobre esa tabla sensibilidad,
+especificidad, exactitud (con IC 95%), kappa de Cohen, y desglosa los casos
+discordantes uno por uno con su explicación más probable — ver la sección
+"Discusión" del notebook para el detalle completo, incluida la limitación
+pendiente del coeficiente de variación de tiempo/RAM (las 5 muestras
+marcadas como control de reproducibilidad todavía se corren una sola vez,
+no las 3 corridas independientes previstas
 originalmente).

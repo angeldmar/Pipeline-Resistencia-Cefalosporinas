@@ -1,4 +1,9 @@
-# Ambiente para la regla run_statistics (workflow/rules/statistics.smk).
+# Ambiente para la regla run_statistics (workflow/rules/statistics.smk), y
+# tambien el que usa el notebook de la validacion estadistica
+# (validacion_estadistica/notebooks/validacion_estadistica.ipynb): mismo
+# criterio de reutilizar ambientes ya creados por Snakemake que sigue
+# run_validation_batch.py para el resto de herramientas de esa seccion, en
+# vez de mantener un ambiente R separado solo para el notebook.
 #
 # r-stringi se agrega explicitamente: al instalar estos paquetes via
 # install.packages() (fuera de conda, directo en el R del sistema) durante
@@ -6,6 +11,14 @@
 # el import de la libreria fallaba con "no package called stringi" hasta
 # instalarla aparte. Se deja fijada aqui para que quien recree este ambiente
 # via conda no se tope con el mismo problema.
+#
+# r-irkernel, jupyter, nbconvert y pandoc son solo para poder abrir y
+# ejecutar el notebook de la validacion estadistica (IRkernel registra el
+# kernel "ir" que declara el notebook; nbconvert + pandoc permiten
+# ejecutarlo sin abrir Jupyter, via
+# "jupyter nbconvert --to notebook --execute --inplace"). La regla
+# run_statistics.R de la seccion operativa no los necesita para nada, solo
+# viajan en el mismo ambiente por conveniencia.
 channels:
   - conda-forge
 dependencies:
@@ -15,3 +28,7 @@ dependencies:
   - r-irr
   - r-ggplot2
   - r-stringi
+  - r-irkernel
+  - jupyter
+  - nbconvert
+  - pandoc
