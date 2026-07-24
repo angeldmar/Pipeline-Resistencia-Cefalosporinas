@@ -1427,14 +1427,22 @@ la base de datos completa de Kraken2 (sin recortar) para mejorar la
 resolución de especie.
 
 **Segunda sección del proyecto — validación estadística:** además de la
-herramienta operativa (este pipeline y su interfaz web), el proyecto tendrá
-una sección separada para validar estadísticamente las predicciones
-genotípicas contra fenotipos de referencia documentados, usando muestras
-reales aportadas para ese fin. La estructura ya está creada en
-`validacion_estadistica/` (`muestras/`, `resultados/`, y un notebook de R
-`notebooks/validacion_estadistica.ipynb` con apartados para muestras
-reales, resultados por muestra y una discusión final) — sin contenido
-todavía, a la espera de esas muestras.
+herramienta operativa (este pipeline y su interfaz web), el proyecto tiene
+una sección separada (`validacion_estadistica/`) que valida
+estadísticamente las predicciones genotípicas contra fenotipos de
+referencia documentados, usando 92 genomas reales de *E. coli* descargados
+de NCBI. El pipeline (modo solo-ensamblaje, `run_validation_batch.py`) ya
+corrió sobre las 92 muestras, y `notebooks/validacion_estadistica.ipynb`
+(R vía IRkernel) tiene el análisis completo: sensibilidad 77.2% (IC 95%
+64.2–87.3%), especificidad 86.7% (IC 95% 69.3–96.2%), exactitud 80.5% (IC
+95% 70.6–88.2%) y kappa de Cohen 0.596 (p < 0.001) sobre las 87 muestras
+con estándar de referencia evaluable, más la revisión caso por caso de los
+13 falsos negativos y 4 falsos positivos y su explicación más probable
+(detalle en el notebook). Pendiente: extender `run_validation_batch.py`
+para correr 3 veces las 5 muestras marcadas como control de
+reproducibilidad y así calcular el coeficiente de variación de tiempo/RAM
+para esta sección (ya implementado para la sección operativa, ver
+`workflow/scripts/run_statistics.R`).
 
 ## Licencia
 

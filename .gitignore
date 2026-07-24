@@ -64,3 +64,7 @@ validacion_estadistica/muestras/*.xls
 # que results/ en la herramienta operativa.
 validacion_estadistica/resultados/*
 !validacion_estadistica/resultados/.gitkeep
+
+# Logs de corridas del lote de validacion estadistica (run_validation_batch.py):
+# igual criterio que logs/ en la herramienta operativa, no se versionan.
+validacion_estadistica/logs/
