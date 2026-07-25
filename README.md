@@ -47,9 +47,13 @@ funciona). Los detalles, modos y ajustes están en
 
 **¿Qué produce?** Para cada muestra, un reporte HTML con los genes de resistencia
 detectados, la verificación de especie, la calidad del ensamblaje y el contexto
-epidemiológico (MLST). Un ejemplo del tipo de análisis que genera —evaluado sobre
-92 genomas reales— está en el
-**[reporte de validación estadística](validacion_estadistica/reporte/analisis_resultados.md)**.
+epidemiológico (MLST). Dos documentos describen el sistema en detalle:
+
+- **[Reporte de arquitectura y producto final](docs/reporte_arquitectura.md)** —
+  el diseño del sistema, el flujo de procesamiento y los productos (interfaz web,
+  reporte por muestra, contenedor), con capturas.
+- **[Reporte de validación estadística](validacion_estadistica/reporte/analisis_resultados.md)** —
+  la concordancia analítica del pipeline evaluada sobre 92 genomas reales.
 
 > ¿Prefieres instalarlo sin Docker (directo con Conda/Snakemake)? Es posible; ver
 > la sección de ambientes Conda más abajo. El contenedor es el camino recomendado

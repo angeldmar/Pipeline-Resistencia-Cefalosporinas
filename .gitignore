@@ -68,3 +68,8 @@ validacion_estadistica/resultados/*
 # Logs de corridas del lote de validacion estadistica (run_validation_batch.py):
 # igual criterio que logs/ en la herramienta operativa, no se versionan.
 validacion_estadistica/logs/
+
+# Reportes generados en docs/ (regenerables con docs/generar_reporte_arquitectura.py);
+# se versiona el script, el markdown navegable y sus figuras, no los binarios.
+docs/*.docx
+docs/*.pdf
