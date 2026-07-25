@@ -18,7 +18,16 @@ from Bio import SeqIO
 def filter_contigs(input_fasta: Path, output_fasta: Path, minimum_length: int = 500) -> tuple[int, int]:
     """Escribe en output_fasta solo los contigs de input_fasta que tengan al
     menos minimum_length bases. Devuelve (contigs_retenidos, contigs_totales)."""
-    all_contigs = list(SeqIO.parse(input_fasta, "fasta"))
+    # "fasta-pearson" en vez del "fasta" a secas: desde Biopython 1.83 el
+    # parser "fasta" deprecio el manejo silencioso de texto antes de la primera
+    # secuencia y en una version futura lanzara ValueError ante el. Para un
+    # ensamblaje real de SPAdes (cabeceras ">NODE_...") el resultado es
+    # identico, y "fasta-pearson" preserva el manejo gracioso del que dependen
+    # las pruebas negativas: un archivo de texto sin ninguna cabecera ">" se
+    # interpreta como cero contigs (que el pipeline reporta como ensamblaje
+    # vacio) en lugar de hacer fallar el script. Un archivo binario/no-texto
+    # sigue fallando temprano con UnicodeDecodeError, como debe.
+    all_contigs = list(SeqIO.parse(input_fasta, "fasta-pearson"))
     retained_contigs = [contig for contig in all_contigs if len(contig.seq) >= minimum_length]
 
     output_fasta.parent.mkdir(parents=True, exist_ok=True)
