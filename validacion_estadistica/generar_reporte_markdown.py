@@ -31,12 +31,6 @@ REPORT_DIR = VALIDATION_DIR / "reporte"
 FIGURES_DIR = REPORT_DIR / "figuras"
 OUTPUT_PATH = REPORT_DIR / "analisis_resultados.md"
 
-FIGURES = [
-    "confusion_matrix_reporte.png",
-    "metricas_comparadas.png",
-    "cv_reproducidabilidad_reporte.png",  # nombre corregido abajo si no existe
-]
-
 
 def pct(x: float) -> str:
     return f"{x * 100:.1f}%"
@@ -59,10 +53,11 @@ def copy_figures() -> dict[str, str]:
     wanted = {
         "confusion": "confusion_matrix_reporte.png",
         "metricas": "metricas_comparadas.png",
-        "cv": "cv_reproducidabilidad_reporte.png",
+        "cv": "cv_reproducibilidad_reporte.png",
     }
-    # el generador del reporte guarda el CV como cv_reproducidabilidad_reporte.png
-    # (ver generar_reporte_tesis.py); si no esta, se intenta el nombre del notebook.
+    # generar_reporte_tesis.py guarda la figura del CV como
+    # cv_reproducibilidad_reporte.png (sin titulo embebido); si no se ha
+    # generado, se recurre a la del notebook (cv_reproducibilidad.png).
     resolved = {}
     for key, filename in wanted.items():
         source = PLOTS_DIR / filename

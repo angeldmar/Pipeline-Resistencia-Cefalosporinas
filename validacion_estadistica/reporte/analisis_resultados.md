@@ -104,6 +104,6 @@ Cada una de las cinco muestras de control se ejecutó tres veces (Tabla 5). El t
 | GCF_000026305_1 | 860.5 | 4.55 | 10.06 | 13.6 |
 | GCF_000234295_1 | 752.5 | 0.56 | 10.28 | 18.53 |
 
-![Coeficiente de variación](figuras/cv_reproducibilidad.png)
+![Coeficiente de variación](figuras/cv_reproducibilidad_reporte.png)
 
 *__Figura 3.__ Coeficiente de variación del tiempo de ejecución y de la RAM máxima entre las tres corridas de cada muestra de control.*
