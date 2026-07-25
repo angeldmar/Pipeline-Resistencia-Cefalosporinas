@@ -6,15 +6,19 @@ poder usarlo sin instalar nada en el sistema salvo Docker.
 
 ## Qué incluye y qué no
 
-| En la imagen | Fuera de la imagen (volumen o descarga) |
+| En la imagen | Fuera de la imagen (volumen) |
 |---|---|
-| Snakemake y el flujo (`workflow/`) | Bases de datos de referencia (~17 GB) |
-| Interfaz web Flask | Datos de entrada (`data/`) |
-| Los 12 ambientes Conda ya creados | Resultados (`results/`) |
+| Snakemake y el flujo (`workflow/`) | Kraken2 (~8–15 GB) |
+| Interfaz web Flask | CheckM (~1.4 GB) |
+| Los 12 ambientes Conda ya creados | Datos de entrada (`data/raw/`) |
+| Base de datos de AMRFinderPlus (~200 MB) | Resultados (`results/`) |
 
-Las bases de datos y los datos de entrada/salida se montan como volúmenes:
-no viajan dentro de la imagen (que sería inmanejable) y persisten en el host
-entre corridas.
+Las bases grandes (Kraken2, CheckM) y los datos de entrada/salida se montan
+como volúmenes: no viajan dentro de la imagen (que sería inmanejable) y
+persisten en el host entre corridas. La base de AMRFinderPlus es la
+excepción: es pequeña y vive dentro de su propio ambiente Conda (la
+herramienta la busca en una ubicación fija, no configurable por ruta), así
+que se incluye en la imagen durante el build.
 
 ## Requisitos
 
@@ -33,7 +37,8 @@ Desde la raíz del repositorio:
 # 1. Construir la imagen (crea los ambientes Conda; tarda y pesa varios GB).
 docker compose build
 
-# 2. Descargar las bases de datos a data/reference (una sola vez, ~17 GB).
+# 2. Descargar Kraken2 y CheckM a data/reference (una sola vez, ~17 GB).
+#    Cada base se salta si ya esta presente en el volumen.
 docker compose run --rm pipeline download-databases
 
 # 3a. Interfaz web: subir un FASTQ/FASTA y ver el reporte.

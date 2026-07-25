@@ -57,6 +57,15 @@ RUN snakemake --use-conda --conda-frontend mamba \
         results/tables/annotation/EC001.tsv \
     && mamba clean -afy
 
+# La base de datos de AMRFinderPlus vive DENTRO de su propio ambiente Conda:
+# la regla amrfinder no usa --database, sino la ubicacion por defecto de la
+# herramienta. Por eso se descarga aqui, en el build, para que viaje en la
+# imagen (es pequena, ~200 MB), a diferencia de Kraken2 y CheckM que son
+# grandes y van por volumen. Se antepone el bin/ del ambiente al PATH para que
+# "amrfinder -u" encuentre blast/hmmer del propio ambiente.
+RUN amrfinder_bin_dir="$(dirname "$(find /pipeline/.snakemake/conda -path '*/bin/amrfinder' | head -1)")" \
+    && PATH="$amrfinder_bin_dir:$PATH" "$amrfinder_bin_dir/amrfinder" -u
+
 # Puerto de la interfaz web.
 EXPOSE 5000
 
