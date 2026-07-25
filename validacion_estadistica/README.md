@@ -92,7 +92,18 @@ confirmada: **sensibilidad 95.3%** (IC 95% 84.2–99.4%), **especificidad
 86.7%** (IC 95% 69.3–96.2%), **exactitud 91.8%** (IC 95% 83.0–96.9%),
 **kappa 0.829** (concordancia casi perfecta) — frente a sensibilidad 77.2%
 y kappa 0.596 sin ese filtro. Ver la sección "Discusión" del notebook para
-el detalle completo, incluida la limitación pendiente del coeficiente de
-variación de tiempo/RAM (las 5 muestras marcadas como control de
-reproducibilidad todavía se corren una sola vez, no las 3 corridas
-independientes previstas originalmente).
+el detalle completo.
+
+`run_reproducibility_check.py` cierra la parte de reproducibilidad
+computacional: corre 3 veces cada una de las 5 muestras marcadas como
+control de reproducibilidad (midiendo tiempo y RAM por corrida, cada réplica
+en su propio proceso para una medición limpia) y el notebook calcula el
+coeficiente de variación. El tiempo de ejecución resultó estable (CV
+promedio 4.0%) y la RAM máxima algo más variable (CV promedio 10.8%), por la
+sensibilidad del pico de memoria de CheckM a la carga del sistema.
+
+`generar_reporte_tesis.py` produce, a partir de los mismos artefactos, la
+sección de "Análisis de resultados" en Word (`resultados/reporte/`), con su
+prosa, tablas y figuras. El notebook también se puede exportar a PDF con
+`jupyter nbconvert --to pdf` (requiere una distribución LaTeX, p. ej.
+TinyTeX).

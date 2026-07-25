@@ -194,6 +194,24 @@ def generate_confusion_figure(contingency: pd.DataFrame, output_path: Path) -> N
     plt.close(fig)
 
 
+def generate_cv_figure(cv: pd.DataFrame, output_path: Path) -> None:
+    samples = list(cv["sample_id"])
+    x = np.arange(len(samples)); width = 0.38
+    fig, ax = plt.subplots(figsize=(7.2, 4.4), dpi=200)
+    ax.bar(x - width / 2, cv["cv_tiempo_pct"], width, color=ACCENT_HEX,
+           edgecolor="#1a1a1a", linewidth=0.6, label="Tiempo de ejecución")
+    ax.bar(x + width / 2, cv["cv_ram_pct"], width, color=BAR_MUTED,
+           edgecolor="#4a4a4a", linewidth=0.6, label="RAM máxima")
+    ax.set_ylabel("CV (%)", fontsize=11)
+    ax.set_xticks(x); ax.set_xticklabels(samples, fontsize=8, rotation=25, ha="right")
+    ax.legend(fontsize=9, frameon=False)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.grid(axis="y", ls=":", alpha=0.4); ax.set_axisbelow(True)
+    plt.tight_layout()
+    plt.savefig(output_path, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+
+
 def generate_metrics_figure(metrics_all: pd.DataFrame, metrics_conf: pd.DataFrame,
                             n_all: int, n_conf: int, output_path: Path) -> None:
     metric_keys = ["Sensitivity", "Specificity", "Accuracy"]
@@ -240,8 +258,10 @@ def load_data() -> dict:
     metrics_all = pd.read_csv(STATS_DIR / "classification_metrics_all_samples.csv").set_index("metric")
     kappa = pd.read_csv(STATS_DIR / "kappa.csv").iloc[0]
     contingency = pd.read_csv(STATS_DIR / "contingency_table.csv")
+    cv_path = STATS_DIR / "cv_reproducibilidad.csv"
+    cv = pd.read_csv(cv_path) if cv_path.exists() else None
     return dict(summary=summary, meta=meta, metrics_conf=metrics_conf,
-                metrics_all=metrics_all, kappa=kappa, contingency=contingency)
+                metrics_all=metrics_all, kappa=kappa, contingency=contingency, cv=cv)
 
 
 # ---------------------------------------------------------------------------
@@ -390,12 +410,39 @@ def build_document(data: dict) -> Document:
         "ambos motores de detección coincidieron en ese resultado. El desempeño decae de forma "
         "gradual con la calidad del ensamblaje, sin quiebres abruptos.")
 
-    # ---- Reproducibilidad (pendiente) ----
+    # ---- Reproducibilidad ----
     heading(document, "Reproducibilidad computacional", 2)
-    add_placeholder(document,
-        "[Sección pendiente.] El coeficiente de variación del tiempo de ejecución y del consumo de "
-        "memoria entre corridas repetidas de una misma muestra se encuentra en cálculo; sus "
-        "resultados y su interpretación se incorporarán en este apartado.")
+    cv = data.get("cv")
+    if cv is None:
+        add_placeholder(document,
+            "[Sección pendiente.] El coeficiente de variación del tiempo de ejecución y del consumo "
+            "de memoria entre corridas repetidas de una misma muestra se encuentra en cálculo.")
+        return document
+
+    cv_time_mean = cv["cv_tiempo_pct"].mean()
+    cv_time_max = cv["cv_tiempo_pct"].max()
+    cv_ram_mean = cv["cv_ram_pct"].mean()
+    cv_ram_max = cv["cv_ram_pct"].max()
+    add_body(document,
+        f"Cada una de las cinco muestras de control se ejecutó tres veces (Tabla 5). El tiempo de "
+        f"ejecución se mantuvo estable entre corridas, con un coeficiente de variación promedio del "
+        f"{cv_time_mean:.1f}% y un máximo del {cv_time_max:.1f}%. La RAM máxima fluctuó más —CV "
+        f"promedio del {cv_ram_mean:.1f}%, hasta el {cv_ram_max:.1f}% en una muestra—, porque el "
+        "pico de memoria depende del paso de colocación filogenética de CheckM, sensible a la "
+        "presión de memoria del sistema y a la carga concurrente del equipo durante cada corrida "
+        "(Figura 3). El tiempo de cómputo del pipeline es reproducible; el consumo de memoria pico "
+        "admite una variación moderada según las condiciones de ejecución.")
+
+    cv_table = cv.copy()
+    cv_table.columns = ["Muestra", "Tiempo medio (s)", "CV tiempo (%)", "RAM media (GB)", "CV RAM (%)"]
+    add_table_caption(document, "Tabla 5", "Media y coeficiente de variación del tiempo de ejecución "
+                      "y de la RAM máxima entre las tres corridas de cada muestra.")
+    add_dataframe_table(document, cv_table, font_size=8)
+
+    if (PLOTS_DIR / "cv_reproducibilidad_reporte.png").exists():
+        add_figure(document, PLOTS_DIR / "cv_reproducibilidad_reporte.png", width_inches=5.6)
+        add_caption(document, "Figura 3", "Coeficiente de variación del tiempo de ejecución y de la "
+                    "RAM máxima entre las tres corridas de cada muestra de control.")
 
     return document
 
@@ -413,6 +460,8 @@ def main() -> None:
         n_conf=int(data["metrics_conf"].loc["Accuracy", "n"]),
         output_path=PLOTS_DIR / "metricas_comparadas.png",
     )
+    if data.get("cv") is not None:
+        generate_cv_figure(data["cv"], PLOTS_DIR / "cv_reproducibilidad_reporte.png")
 
     document = build_document(data)
     document.save(OUTPUT_PATH)
