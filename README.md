@@ -14,6 +14,47 @@ repositorios públicos. El proyecto **no pretende validación clínica** ni su
 implementación inmediata en entornos institucionales: los reportes describen
 determinantes genotípicos detectados, nunca conclusiones clínicas.
 
+## Inicio rápido con Docker
+
+La forma más sencilla de usar el pipeline —sin instalar nada más que
+[Docker](https://docs.docker.com/get-docker/)— es a través del contenedor, que ya
+trae todas las herramientas bioinformáticas listas. Desde una terminal, en la
+carpeta del proyecto:
+
+```bash
+# 1. Construir la imagen (incluye las 12 herramientas; tarda y ocupa ~17 GB).
+docker compose build
+
+# 2. Descargar las bases de datos de referencia a data/ (una sola vez, ~17 GB).
+docker compose run --rm pipeline download-databases
+
+# 3a. Interfaz web: subir un genoma (FASTA) o lecturas (FASTQ) y ver su reporte.
+docker compose up
+#     Abrir http://localhost:8080 en el navegador.
+```
+
+Para procesar un lote de muestras por línea de comandos en lugar de la interfaz web:
+
+```bash
+# 3b. Pipeline por lotes sobre config/samples.tsv:
+docker compose run --rm pipeline pipeline --cores 8
+```
+
+**Requisitos:** Docker con Docker Compose y unos ~35 GB de disco libre (imagen +
+bases de datos). En una Mac con chip Apple corre por emulación (más lento, pero
+funciona). Los detalles, modos y ajustes están en
+[`docker/README.md`](docker/README.md).
+
+**¿Qué produce?** Para cada muestra, un reporte HTML con los genes de resistencia
+detectados, la verificación de especie, la calidad del ensamblaje y el contexto
+epidemiológico (MLST). Un ejemplo del tipo de análisis que genera —evaluado sobre
+92 genomas reales— está en el
+**[reporte de validación estadística](validacion_estadistica/reporte/analisis_resultados.md)**.
+
+> ¿Prefieres instalarlo sin Docker (directo con Conda/Snakemake)? Es posible; ver
+> la sección de ambientes Conda más abajo. El contenedor es el camino recomendado
+> para empezar rápido.
+
 ## Arquitectura
 
 El pipeline sigue un diseño **Python-first**, con roles claramente separados:
@@ -1445,12 +1486,16 @@ kappa 0.596) y con especie confirmada (73 muestras, **sensibilidad 95.3%**
 IC 95% 84.2–99.4%, **especificidad 86.7%** IC 95% 69.3–96.2%, **exactitud
 91.8%** IC 95% 83.0–96.9%, **kappa de Cohen 0.829**, concordancia casi
 perfecta) — más la revisión caso por caso de los 2 falsos negativos y 4
-falsos positivos genuinos que quedan y su explicación más probable
-(detalle en el notebook). Pendiente: extender `run_validation_batch.py`
-para correr 3 veces las 5 muestras marcadas como control de
-reproducibilidad y así calcular el coeficiente de variación de tiempo/RAM
-para esta sección (ya implementado para la sección operativa, ver
-`workflow/scripts/run_statistics.R`).
+falsos positivos genuinos que quedan y su explicación más probable. La
+reproducibilidad computacional también está cubierta: `run_reproducibility_check.py`
+corre 3 veces cada una de las 5 muestras de control y el notebook calcula el
+coeficiente de variación (tiempo de ejecución estable, CV promedio 4.0%; RAM
+máxima algo más variable, CV promedio 10.8%).
+
+El análisis completo, con sus tablas y figuras, está disponible como documento
+navegable en
+**[`validacion_estadistica/reporte/analisis_resultados.md`](validacion_estadistica/reporte/analisis_resultados.md)**
+(y como reporte en Word / notebook de R dentro de `validacion_estadistica/`).
 
 ## Licencia
 

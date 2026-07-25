@@ -27,6 +27,10 @@ genotípicas del pipeline con los fenotipos de referencia documentados.
   el notebook. Es solo la capa de presentación para tesis; no recalcula
   estadística. La salida va a `resultados/reporte/` (no versionada, se
   regenera corriendo el script).
+- `generar_reporte_markdown.py`: la contraparte navegable en el repositorio.
+  Genera `reporte/analisis_resultados.md` (con sus figuras en
+  `reporte/figuras/`, ambos SÍ versionados) para poder leer el análisis
+  directamente en GitHub; el README raíz enlaza a ese documento.
 
 ## Estado
 
