@@ -1432,12 +1432,20 @@ una sección separada (`validacion_estadistica/`) que valida
 estadísticamente las predicciones genotípicas contra fenotipos de
 referencia documentados, usando 92 genomas reales de *E. coli* descargados
 de NCBI. El pipeline (modo solo-ensamblaje, `run_validation_batch.py`) ya
-corrió sobre las 92 muestras, y `notebooks/validacion_estadistica.ipynb`
-(R vía IRkernel) tiene el análisis completo: sensibilidad 77.2% (IC 95%
-64.2–87.3%), especificidad 86.7% (IC 95% 69.3–96.2%), exactitud 80.5% (IC
-95% 70.6–88.2%) y kappa de Cohen 0.596 (p < 0.001) sobre las 87 muestras
-con estándar de referencia evaluable, más la revisión caso por caso de los
-13 falsos negativos y 4 falsos positivos y su explicación más probable
+corrió sobre las 92 muestras, y `run_taxonomy_check.py` corrió Kraken2
+sobre cada ensamblaje para confirmar la especie — al revisar los primeros
+resultados, 14 de las 92 muestras (15.2%) resultaron no ser realmente
+*E. coli* (Klebsiella, Salmonella, Listeria y otras, hasta una muestra
+predominantemente humana), probablemente por sustituciones de accesión sin
+verificar durante el armado del conjunto (ver
+`validacion_estadistica/muestras/README.md`). `notebooks/validacion_estadistica.ipynb`
+(R vía IRkernel) tiene el análisis completo, con las dos versiones lado a
+lado: sin filtrar por especie (87 muestras evaluables, sensibilidad 77.2%,
+kappa 0.596) y con especie confirmada (73 muestras, **sensibilidad 95.3%**
+IC 95% 84.2–99.4%, **especificidad 86.7%** IC 95% 69.3–96.2%, **exactitud
+91.8%** IC 95% 83.0–96.9%, **kappa de Cohen 0.829**, concordancia casi
+perfecta) — más la revisión caso por caso de los 2 falsos negativos y 4
+falsos positivos genuinos que quedan y su explicación más probable
 (detalle en el notebook). Pendiente: extender `run_validation_batch.py`
 para correr 3 veces las 5 muestras marcadas como control de
 reproducibilidad y así calcular el coeficiente de variación de tiempo/RAM

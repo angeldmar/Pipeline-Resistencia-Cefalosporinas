@@ -60,17 +60,34 @@ con la versión de AMRFinderPlus de este proyecto ocurre naturalmente al
 correr el pipeline sobre ellas — que es, de hecho, el propósito de esta
 validación.
 
-**Pipeline corrido, notebook completo y ejecutado.** `run_validation_batch.py`
-procesó las 92 muestras (modo solo-ensamblaje: QUAST, CheckM, AMRFinderPlus,
-ABricate, MLST, comparación contra el estándar de referencia).
-`prepare_statistics_input.py` junta esos resultados por muestra en
+**Pipeline corrido, verificación taxonómica corrida, notebook completo y
+ejecutado.** `run_validation_batch.py` procesó las 92 muestras (modo
+solo-ensamblaje: QUAST, CheckM, AMRFinderPlus, ABricate, MLST, comparación
+contra el estándar de referencia), y `run_taxonomy_check.py` corrió
+Kraken2 sobre cada ensamblaje para confirmar la especie de cada muestra.
+
+Ese segundo paso surgió al revisar los primeros falsos negativos: varios
+tenían %GC muy alejado del rango normal de *E. coli* y MLST sin ningún
+alelo resuelto. Kraken2 confirmó la sospecha — **14 de las 92 muestras
+(15.2%) no son realmente *E. coli*** (Klebsiella, Salmonella, Citrobacter,
+Listeria, Staphylococcus, Aeromonas, y una predominantemente humana),
+casi con seguridad por sustituciones de accesión sin verificar durante el
+armado del conjunto (ver `Brechas y por qué no se completaron` arriba).
+Ninguna de las 14 es un control negativo ni un control límite.
+
+`prepare_statistics_input.py` junta reference_comparison, CheckM, QUAST,
+MLST, Kraken2 (`species_check`) y la categoría de control en
 `resultados/tables/validation_summary.tsv`, y
 `notebooks/validacion_estadistica.ipynb` (R vía IRkernel, ambiente
-`workflow/envs/r_statistics.yaml`) calcula sobre esa tabla sensibilidad,
-especificidad, exactitud (con IC 95%), kappa de Cohen, y desglosa los casos
-discordantes uno por uno con su explicación más probable — ver la sección
-"Discusión" del notebook para el detalle completo, incluida la limitación
-pendiente del coeficiente de variación de tiempo/RAM (las 5 muestras
-marcadas como control de reproducibilidad todavía se corren una sola vez,
-no las 3 corridas independientes previstas
-originalmente).
+`workflow/envs/r_statistics.yaml`) calcula sensibilidad, especificidad,
+exactitud (con IC 95%) y kappa de Cohen dos veces — sin filtrar por especie
+(87 muestras evaluables) y excluyendo las 14 de otra especie (73 muestras)
+— y desglosa los casos discordantes uno por uno. Sobre las 73 de especie
+confirmada: **sensibilidad 95.3%** (IC 95% 84.2–99.4%), **especificidad
+86.7%** (IC 95% 69.3–96.2%), **exactitud 91.8%** (IC 95% 83.0–96.9%),
+**kappa 0.829** (concordancia casi perfecta) — frente a sensibilidad 77.2%
+y kappa 0.596 sin ese filtro. Ver la sección "Discusión" del notebook para
+el detalle completo, incluida la limitación pendiente del coeficiente de
+variación de tiempo/RAM (las 5 muestras marcadas como control de
+reproducibilidad todavía se corren una sola vez, no las 3 corridas
+independientes previstas originalmente).
