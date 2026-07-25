@@ -22,6 +22,11 @@ genotípicas del pipeline con los fenotipos de referencia documentados.
 - `notebooks/validacion_estadistica.ipynb`: notebook de R (kernel IRkernel)
   con tres apartados — muestras reales, resultados por muestra, y una
   discusión final que integra todos los casos.
+- `generar_reporte_tesis.py`: genera un reporte en Word (formato académico,
+  con sus tablas y figuras) a partir de los mismos artefactos que ya calculó
+  el notebook. Es solo la capa de presentación para tesis; no recalcula
+  estadística. La salida va a `resultados/reporte/` (no versionada, se
+  regenera corriendo el script).
 
 ## Estado
 
