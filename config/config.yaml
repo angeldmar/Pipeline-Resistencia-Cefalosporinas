@@ -80,7 +80,14 @@ amr:
 # (linaje/secuencia tipo) para los genes de resistencia detectados.
 # ----------------------------------------------------------------------------
 mlst:
-  scheme: "ecoli"    # esquema de Achtman (7 genes) para E. coli; "mlst" tambien puede autodetectar si se deja vacio
+  # Esquema de Achtman (7 loci: adk, fumC, gyrB, icd, mdh, purA, recA), el
+  # estandar de la literatura de E. coli (EnteroBase, tipificacion de clones
+  # como ST131). OJO: en la herramienta mlst el esquema se llama
+  # "ecoli_achtman_4", NO "ecoli" -- este ultimo apunta al esquema de Pasteur
+  # (8 loci con uidA/dinB), que da numeros de ST distintos y no comparables
+  # con la literatura (p. ej. la cepa de referencia EC958 es ST131 en Achtman
+  # pero ST43 en Pasteur). Dejar vacio hace que "mlst" autodetecte el esquema.
+  scheme: "ecoli_achtman_4"
 
 # ----------------------------------------------------------------------------
 # Pruebas de reproducibilidad: numero de corridas repetidas por muestra
