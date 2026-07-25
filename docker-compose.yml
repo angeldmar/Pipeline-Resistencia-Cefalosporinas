@@ -1,0 +1,34 @@
+# Orquestacion del contenedor del pipeline. Un solo servicio sirve los dos
+# modos de uso: la interfaz web (por defecto) y el pipeline por linea de
+# comandos (Snakemake).
+#
+# Uso tipico:
+#   docker compose build                              # construir la imagen
+#   docker compose run --rm pipeline download-databases   # bajar las BD (~una vez)
+#   docker compose up                                 # interfaz web en :5000
+#   docker compose run --rm pipeline pipeline --cores 8   # correr el lote (CLI)
+#
+# Las bases de datos (data/reference), los datos de entrada (data/raw) y los
+# resultados (results) viven en el host, montados como volumenes: persisten
+# entre corridas y no inflan la imagen.
+
+services:
+  pipeline:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: pipeline-amr-ecoli:latest
+    platform: linux/amd64
+    ports:
+      # Puerto del host configurable con HOST_PORT (por defecto 8080). Se evita
+      # el 5000 porque en macOS lo ocupa el receptor de AirPlay (Control Center).
+      - "${HOST_PORT:-8080}:5000"
+    volumes:
+      - ./data:/pipeline/data
+      - ./results:/pipeline/results
+    environment:
+      # Puerto interno de la interfaz web dentro del contenedor.
+      WEBAPP_PORT: "5000"
+      # Indice Kraken2 a descargar con "download-databases" (ver el script para
+      # alternativas; por defecto el standard-8, capado a 8 GB).
+      # KRAKEN_DB_URL: "https://genome-idx.s3.amazonaws.com/kraken/k2_standard_20240904.tar.gz"

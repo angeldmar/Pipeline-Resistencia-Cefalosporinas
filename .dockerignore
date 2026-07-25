@@ -1,0 +1,40 @@
+# Contexto de build de Docker: se excluye todo lo que la imagen NO necesita
+# para correr el pipeline, en especial lo pesado (datos, bases de datos,
+# ambientes ya creados) que se monta como volumen o se genera en runtime.
+
+# Control de versiones y config de IDE
+.git/
+.gitignore
+.idea/
+.claude/
+
+# Ambientes Conda ya creados por Snakemake en el host: la imagen crea los
+# suyos propios en build (para linux-64), no se reutilizan los del host.
+.snakemake/
+
+# Datos y resultados generados: van por volumen montado, nunca en la imagen.
+data/
+results/
+logs/
+
+# Bases de datos de referencia (~17 GB): se descargan a un volumen con
+# docker/download_databases.sh, jamas dentro de la imagen.
+# (ya cubiertas por data/ arriba, se listan por claridad)
+
+# Interfaz web: carpetas de trabajo por carga, generadas en runtime.
+webapp/runs/
+webapp/__pycache__/
+
+# Seccion de validacion estadistica: no es parte del pipeline operativo y
+# arrastra los 92 genomas versionados (cientos de MB de FASTA) + reportes.
+validacion_estadistica/
+
+# Artefactos de Python y sistema
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.DS_Store
+
+# Carpeta temporal de trabajo
+carpeta temporal/

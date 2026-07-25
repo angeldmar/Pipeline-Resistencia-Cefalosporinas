@@ -17,6 +17,8 @@ Uso:
 
 from __future__ import annotations
 
+import os
+
 from flask import Flask, redirect, render_template, request, send_file, url_for
 
 import pipeline_runner as runner
@@ -110,4 +112,10 @@ def view_report(sample_id: str):
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    # Host, puerto y modo debug configurables por variable de entorno, para
+    # poder servir dentro de un contenedor (WEBAPP_HOST=0.0.0.0) sin cambiar
+    # el comportamiento local por defecto (solo 127.0.0.1, con debug).
+    host = os.environ.get("WEBAPP_HOST", "127.0.0.1")
+    port = int(os.environ.get("WEBAPP_PORT", "5000"))
+    debug = os.environ.get("WEBAPP_DEBUG", "1") == "1"
+    app.run(debug=debug, host=host, port=port)
